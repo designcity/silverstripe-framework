@@ -355,7 +355,10 @@
 							addbutton.removeAttr('disabled');
 						}
 					}
-				});
+				}).data("ui-autocomplete")._renderItem = function(ul, item) {
+										var $a = $("<a></a>").html(item.label);
+										return $("<li></li>").append($a).appendTo(ul);
+				};
 			}
 		});
 
