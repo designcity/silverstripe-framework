@@ -8,7 +8,7 @@
 			 */
 
 			reload: function(ajaxOpts, successCallback) {
-				var self = this, form = this.closest('form'), 
+				var self = this, form = this.closest('form'),
 					focusedElName = this.find(':input:focus').attr('name'), // Save focused element for restoring after refresh
 					data = form.find(':input').serializeArray();
 
@@ -23,7 +23,7 @@
 					ajaxOpts.data = window.location.search.replace(/^\?/, '') + '&' + $.param(ajaxOpts.data);
 				}
 				
-				// For browsers which do not support history.pushState like IE9, ss framework uses hash to track 
+				// For browsers which do not support history.pushState like IE9, ss framework uses hash to track
 				// the current location for PJAX, so for them we pass the query string stored in the hash instead
 				if(!window.history || !window.history.pushState){
 					if(window.location.hash && window.location.hash.indexOf('?') != -1){
@@ -48,15 +48,15 @@
 						// multiple relationships via keyboard.
 						if(focusedElName) self.find(':input[name="' + focusedElName + '"]').focus();
 
-						// Update filter 
+						// Update filter
 						if(self.find('.filter-header').length) {
 							var content;
 							if(ajaxOpts.data[0].filter=="show") {
 								content = '<span class="non-sortable"></span>';
-								self.addClass('show-filter').find('.filter-header').show();														
+								self.addClass('show-filter').find('.filter-header').show();
 							} else {
 								content = '<button name="showFilter" class="ss-gridfield-button-filter trigger"></button>';
-								self.removeClass('show-filter').find('.filter-header').hide();	
+								self.removeClass('show-filter').find('.filter-header').hide();
 							}
 
 							self.find('.sortable-header th:last').html(content);
@@ -104,7 +104,7 @@
 
 
 		$('.ss-gridfield :button[name=showFilter]').entwine({
-			onclick: function(e) {				
+			onclick: function(e) {
 				$('.filter-header')
 					.show('slow') // animate visibility
 					.find(':input:first').focus(); // focus first search field
@@ -136,6 +136,12 @@
 		$('.ss-gridfield .action').entwine({
 			onclick: function(e){
 				var filterState='show'; //filterstate should equal current state.
+
+				// If the button is disabled, do nothing.
+				if (this.button('option', 'disabled')) {
+					e.preventDefault();
+					return;
+				}
 				
 				if(this.hasClass('ss-gridfield-button-close') || !(this.closest('.ss-gridfield').hasClass('show-filter'))){
 					filterState='hidden';
@@ -143,6 +149,34 @@
 
 				this.getGridField().reload({data: [{name: this.attr('name'), value: this.val(), filter: filterState}]});
 				e.preventDefault();
+			}
+		});
+
+		/**
+		 * Don't allow users to submit empty values in grid field auto complete inputs.
+		 */
+		$('.ss-gridfield .add-existing-autocompleter').entwine({
+			onbuttoncreate: function () {
+				var self = this;
+
+				this.toggleDisabled();
+
+				this.find('input[type="text"]').on('keyup', function () {
+					self.toggleDisabled();
+				});
+			},
+			onunmatch: function () {
+				this.find('input[type="text"]').off('keyup');
+			},
+			toggleDisabled: function () {
+				var $button = this.find('.ss-ui-button'),
+					$input = this.find('input[type="text"]'),
+					inputHasValue = $input.val() !== '',
+					buttonDisabled = $button.is(':disabled');
+
+				if ((inputHasValue && buttonDisabled) || (!inputHasValue && !buttonDisabled)) {
+					$button.button("option", "disabled", !buttonDisabled);
+				}
 			}
 		});
 
@@ -198,11 +232,13 @@
 		
 		$('.ss-gridfield-print-iframe').entwine({
 			onmatch: function(){
+				this._super();
+
 				this.hide().bind('load', function() {
 					this.focus();
 					var ifWin = this.contentWindow || this;
 					ifWin.print();
-				});;
+				});
 			},
 			onunmatch: function() {
 				this._super();
@@ -268,15 +304,15 @@
 			}
 		});
 		$('.ss-gridfield[data-selectable] .ss-gridfield-items').entwine({
-			onmatch: function() {
+			onadd: function() {
 				this._super();
-				
+
 				// TODO Limit to single selection
 				this.selectable();
 			},
-			onunmatch: function() {
+			onremove: function() {
 				this._super();
-				this.selectable('destroy');
+				if (this.data('selectable')) this.selectable('destroy');
 			}
 		});
 		

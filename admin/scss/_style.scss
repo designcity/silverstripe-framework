@@ -134,6 +134,10 @@ body.cms {
 			margin-right: 4px;
 			background-repeat: no-repeat;
 		}
+
+		.cms_backlink {
+			vertical-align: middle;
+		}
 	}
 	
 	// Reset to default styles
@@ -416,8 +420,9 @@ body.cms {
 	.loading-animation {
 		display: none;
 		position: absolute;
-		left: 49%;
-		top: 75%;
+		left: 50%;
+		margin-left: -21.5px; // Half of spinner size
+		top: 80%;
 	}
 }
 
@@ -428,7 +433,7 @@ body.cms {
 .cms-content-actions, .cms-preview-controls {
 	margin: 0;
 	padding: $grid-y*1.5 $grid-y*1.5;
-	z-index: 0;
+	z-index: 999;
 	border-top: 1px solid lighten($color-separator, 4%);
 	@include box-shadow(
 		1px 0 0 $tab-panel-texture-color, 
@@ -712,7 +717,7 @@ body.cms {
  */
 .cms-content-tools {
 	background: $tab-panel-texture-color;
-	width: $grid-x * 25;
+	width: $grid-x * 36;
 	overflow-y: auto;	
 	overflow-x: hidden;
 	z-index: 70;
@@ -735,7 +740,7 @@ body.cms {
 	}
 	
 	.cms-panel-content {
-		width: ($grid-x * 23);
+		width: $grid-x * 34;
 		padding: $grid-x*1.1 $grid-x 0; // smaller left/right padding to use space efficiently
 		overflow: auto;
 		height:100%;
@@ -906,7 +911,7 @@ body.cms {
 			vertical-align: middle;
 		}
 
-		label {
+		.view-mode-batchactions-label {
 			vertical-align: middle;
 			display: none;
 		}
@@ -922,7 +927,7 @@ body.cms {
 		&.inactive .view-mode-batchactions-wrapper {
 			border-radius: 4px;
 
-			label {
+			.view-mode-batchactions-label {
 				display: inline;
 			}
 		}
@@ -1177,7 +1182,7 @@ form.member-profile-form {
 			span {
 				display: inline-block;
 				margin: 0 5px;
-				color: $color-text-dark;
+				color: #555d60;
 				font-size: 16px;
 			}
 			
@@ -1312,10 +1317,12 @@ form.member-profile-form {
 // most styles should be applied to .cms-dialog instead (which declares the content in the frame)
 .ui-dialog {
 	background: url("../images/textures/bg_cms_main_content.png") repeat left top #F0F3F4;
-	border: 3px solid #000 !important;
-	border-radius: $grid-y;
+	background-clip: content-box;
+	border: 1px solid #666 !important;
+	@include border-radius($grid-y);
 	overflow: visible;
 	padding: 0;
+	@include box-shadow(0px 0px 30px 10px rgba(0,0,0,.3));
  
   	// Titlebar for pop-up dialog.
 	.ui-dialog-titlebar.ui-widget-header {
@@ -1334,6 +1341,7 @@ form.member-profile-form {
 	}
 
 	.ui-dialog-content {
+		@include border-radius($grid-y);
 		overflow: auto; // TODO Replace with proper $.layout grid
 
 		&.loading {
@@ -1414,11 +1422,14 @@ body.cms-dialog {
 			float:left;
 			position: relative;
 
-      label {
-			position: absolute;
-			left: 8px;
-			top: 13px;
-			font-weight: normal; color: #888;
+			label {
+				position: absolute;
+				left: 8px;
+				top: 13px;
+				font-weight: normal; 
+				color: #888;
+				width: 35px; 
+				padding-right: 0;
 			}
 
 			.middleColumn {
@@ -1427,11 +1438,11 @@ body.cms-dialog {
 
 			input.remoteurl {
 				padding-left: 40px;
+				max-width: 350px;
 			}
 		}
 		button.add-url{
-			margin-top:5px;
-			padding-top:15px;
+			margin-top:20px;
 			@include clearfix;
 			border:none;
 			background:none;
@@ -1443,9 +1454,7 @@ body.cms-dialog {
 			}
 			.ui-button-text{
 				margin-left:10px;
-				margin-top:-5px;
-				line-height:20px;
-				float:left;
+				padding-top:10px;
 			}
 			&:hover, &:active{
 				border:none;
@@ -1471,7 +1480,7 @@ body.cms-dialog {
 		width:100%;
 		height: 40px;
 		h3{
-			padding: 0 8px;
+			padding: 3px 8px;
 			margin: 10px;
 		}
 	}
@@ -1518,6 +1527,11 @@ body.cms-dialog {
 	.step2 {
 		margin-bottom: $grid-x*2;
 	}
+	.ss-uploadfield {
+		.middleColumn {
+			width: auto;
+		}
+	}
 }
 
 .htmleditorfield-mediaform {
@@ -1525,18 +1539,6 @@ body.cms-dialog {
 		.gridfield-button-delete {
 			// TODO Remove from PHP instead of hiding
 			display: none; // delete action shouldn't be allowed here
-		}
-		table.ss-gridfield-table {
-			tbody td:first-child {
-				padding: 0;
-				text-align: center;
-				img {
-					max-height: 30px; // same thumbnail size as uploadfield rows
-				}
-			}
-			tr td {
-				padding: $grid-x/2; // more compressed space
-			}	
 		}
 	}
 
@@ -1561,6 +1563,8 @@ body.cms-dialog {
 			.middleColumn {
 				margin-top: $grid-y*2; // same as left-floated h4
 				margin-left: $grid-x*23; // make room for headline
+				min-width: 0; // fit within available space
+				clear: none; // headline and dropdown on same line
 			}
 			.field.treedropdown {
 				border-bottom: 0; // don't show border, dropdown and gridfield visually belong together
@@ -1654,6 +1658,7 @@ body.cms-dialog {
 	}
 	.cms-file-info-data {
 		float: left;
+		width: 55%;
 
 		.field {
 			// Unsetting styles from .field, make it more compact visually

@@ -134,15 +134,22 @@ JS;
 	 * Get message from session
 	 */
 	protected function getMessageFromSession() {
-		parent::getMessageFromSession();
-		if(($member = Member::currentUser()) && !Session::get('MemberLoginForm.force_message')) {
+
+		$forceMessage = Session::get('MemberLoginForm.force_message');
+		if(($member = Member::currentUser()) && !$forceMessage) {
 			$this->message = _t(
 				'Member.LOGGEDINAS',
 				"You're logged in as {name}.",
 				array('name' => $member->{$this->loggedInAsField})
 			);
 		}
-		Session::set('MemberLoginForm.force_message', false);
+
+		// Reset forced message
+		if($forceMessage) {
+			Session::set('MemberLoginForm.force_message', false);
+		}
+
+		return parent::getMessageFromSession();
 	}
 
 
@@ -187,7 +194,7 @@ JS;
 	 * )
 	 *
 	 * @param array $data
-	 * @return void
+	 * @return SS_HTTPResponse
 	 */
 	protected function logInUserAndRedirect($data) {
 		Session::clear('SessionForms.MemberLoginForm.Email');
@@ -198,26 +205,32 @@ JS;
 				Session::set('BackURL', $backURL);
 			}
 			$cp = new ChangePasswordForm($this->controller, 'ChangePasswordForm');
-			$cp->sessionMessage('Your password has expired. Please choose a new one.', 'good');
+			$cp->sessionMessage(
+				_t('Member.PASSWORDEXPIRED', 'Your password has expired. Please choose a new one.'),
+				'good'
+			);
 			return $this->controller->redirect('Security/changepassword');
 		}
 
 		// Absolute redirection URLs may cause spoofing
-		if(isset($_REQUEST['BackURL']) && $_REQUEST['BackURL'] && Director::is_site_url($_REQUEST['BackURL']) ) {
-			return $this->controller->redirect($_REQUEST['BackURL']);
-		}
-
-		// Spoofing attack, redirect to homepage instead of spoofing url
-		if(isset($_REQUEST['BackURL']) && $_REQUEST['BackURL'] && !Director::is_site_url($_REQUEST['BackURL'])) {
-			return $this->controller->redirect(Director::absoluteBaseURL());
+		if(!empty($_REQUEST['BackURL'])) {
+			$url = $_REQUEST['BackURL'];
+			if(Director::is_site_url($url) ) {
+				$url = Director::absoluteURL($url);
+			} else {
+				// Spoofing attack, redirect to homepage instead of spoofing url
+				$url = Director::absoluteBaseURL();
+			}
+			return $this->controller->redirect($url);
 		}
 
 		// If a default login dest has been set, redirect to that.
-		if (Security::config()->default_login_dest) {
-			return $this->controller->redirect(Director::absoluteBaseURL() . Security::config()->default_login_dest);
+		if ($url = Security::config()->default_login_dest) {
+			$url = Controller::join_links(Director::absoluteBaseURL(), $url);
+			return $this->controller->redirect($url);
 		}
 
-		// Redirect the user to the page where he came from
+		// Redirect the user to the page where they came from
 		$member = Member::currentUser();
 		if($member) {
 			$firstname = Convert::raw2xml($member->FirstName);
@@ -281,9 +294,19 @@ JS;
 	 * @param array $data Submitted data
 	 */
 	public function forgotPassword($data) {
-		$SQL_data = Convert::raw2sql($data);
-		$SQL_email = $SQL_data['Email'];
-		$member = DataObject::get_one('Member', "\"Email\" = '{$SQL_email}'");
+		// Ensure password is given
+		if(empty($data['Email'])) {
+			$this->sessionMessage(
+				_t('Member.ENTEREMAIL', 'Please enter an email address to get a password reset link.'),
+				'bad'
+			);
+
+			$this->controller->redirect('Security/lostpassword');
+			return;
+		}
+
+		// Find existing member
+		$member = Member::get()->filter("Email", $data['Email'])->first();
 
 		// Allow vetoing forgot password requests
 		$results = $this->extend('forgotPassword', $member);
@@ -306,7 +329,7 @@ JS;
 		} elseif($data['Email']) {
 			// Avoid information disclosure by displaying the same status,
 			// regardless wether the email address actually exists
-			$this->controller->redirect('Security/passwordsent/' . urlencode($data['Email']));
+			$this->controller->redirect('Security/passwordsent/' . rawurlencode($data['Email']));
 		} else {
 			$this->sessionMessage(
 				_t('Member.ENTEREMAIL', 'Please enter an email address to get a password reset link.'),
@@ -318,3 +341,4 @@ JS;
 	}
 
 }
+

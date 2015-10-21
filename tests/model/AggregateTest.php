@@ -3,7 +3,9 @@
 /*
  * A hierarchy of data types, to...
  *
- * @deprecated. This is testing`
+ * @deprecated
+ *
+ * This is testing`
  * {@link DataObject::Aggregate()} and {@link DataObject::RelationshipAggregate()}
  * which are deprecated. Aggregates are handled directly by DataList instead.
  * This test should be removed or merged into DataListTest once those functions are
@@ -18,18 +20,28 @@ class AggregateTest_Foo extends DataObject implements TestOnly {
 	private static $belongs_many_many = array('Bazi' => 'AggregateTest_Baz');
 }
 
+/**
+ * @deprecated
+ */
 class AggregateTest_Fab extends AggregateTest_Foo {
 	private static $db = array(
 		"Fab" => "Int"
 	);
 }
 
+/**
+ * @deprecated
+ */
 class AggregateTest_Fac extends AggregateTest_Fab {
 	private static $db = array(
 		"Fac" => "Int"
 	);
 }
 
+
+/**
+ * @deprecated
+ */
 class AggregateTest_Bar extends DataObject implements TestOnly {
 	private static $db = array(
 		"Bar" => "Int"
@@ -40,6 +52,10 @@ class AggregateTest_Bar extends DataObject implements TestOnly {
 	);
 }
 
+
+/**
+ * @deprecated
+ */
 class AggregateTest_Baz extends DataObject implements TestOnly {
 	private static $db = array(
 		"Baz" => "Int"
@@ -50,6 +66,9 @@ class AggregateTest_Baz extends DataObject implements TestOnly {
 	);
 }
 
+/**
+ * @deprecated
+ */
 class AggregateTest extends SapphireTest {
 	protected static $fixture_file = 'AggregateTest.yml';
 	
@@ -71,8 +90,8 @@ class AggregateTest extends SapphireTest {
 	}
 
 	public function tearDown() {
-		parent::tearDown();
 		Deprecation::restore_settings($this->originalDeprecation);
+		parent::tearDown();
 	}
 	
 	/**

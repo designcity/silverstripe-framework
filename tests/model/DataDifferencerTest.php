@@ -5,19 +5,19 @@
  */
 
 class DataDifferencerTest extends SapphireTest {
-	
+
 	protected static $fixture_file = 'DataDifferencerTest.yml';
-	
+
 	protected $extraDataObjects = array(
 		'DataDifferencerTest_Object',
 		'DataDifferencerTest_HasOneRelationObject',
 		'DataDifferencerTest_MockImage',
 	);
-	
+
 	public function testArrayValues() {
 		$obj1 = $this->objFromFixture('DataDifferencerTest_Object', 'obj1');
 		// create a new version
-		$obj1->Choices = array('a');
+		$obj1->Choices = 'a';
 		$obj1->write();
 		$obj1v1 = Versioned::get_version('DataDifferencerTest_Object', $obj1->ID, $obj1->Version-1);
 		$obj1v2 = Versioned::get_version('DataDifferencerTest_Object', $obj1->ID, $obj1->Version);
@@ -27,7 +27,7 @@ class DataDifferencerTest extends SapphireTest {
 		// an array-based value in the first place.
 		$this->assertContains('<ins>a</ins><del>a,b</del>', str_replace(' ','',$obj1Diff->getField('Choices')));
 	}
-	
+
 	public function testHasOnes() {
 		$obj1 = $this->objFromFixture('DataDifferencerTest_Object', 'obj1');
 		$image1 = $this->objFromFixture('DataDifferencerTest_MockImage', 'image1');
@@ -55,8 +55,8 @@ class DataDifferencerTest extends SapphireTest {
 		$differ = new DataDifferencer($obj1v1, $obj1v2);
 		$obj1Diff = $differ->diffedData();
 
-		$this->assertContains($image1->Filename, $obj1Diff->getField('Image'));
-		$this->assertContains($image2->Filename, $obj1Diff->getField('Image'));
+		$this->assertContains($image1->Name, $obj1Diff->getField('Image'));
+		$this->assertContains($image2->Name, $obj1Diff->getField('Image'));
 		$this->assertContains('<ins>obj2</ins><del>obj1</del>',
 			str_replace(' ','',$obj1Diff->getField('HasOneRelationID')));
 	}
@@ -69,12 +69,12 @@ class DataDifferencerTest_Object extends DataObject implements TestOnly {
 	private static $db = array(
 		'Choices' => "Varchar",
 	);
-	
+
 	private static $has_one = array(
 		'Image' => 'DataDifferencerTest_MockImage',
 		'HasOneRelation' => 'DataDifferencerTest_HasOneRelationObject'
 	);
-	
+
 	public function getCMSFields() {
 		$fields = parent::getCMSFields();
 		$choices = array(
@@ -84,26 +84,18 @@ class DataDifferencerTest_Object extends DataObject implements TestOnly {
 		);
 		$listField = new ListboxField('Choices', 'Choices', $choices);
 		$fields->push($listField);
-		
+
 		return $fields;
-	}
-	
-	public function getChoices() {
-		return explode(',', $this->getField('Choices'));
-	}
-	
-	public function setChoices($val) {
-		$this->setField('Choices', (is_array($val)) ? implode(',', $val) : $val);
 	}
 	
 }
 
 class DataDifferencerTest_HasOneRelationObject extends DataObject implements TestOnly {
-	
+
 	private static $db = array(
 		'Title' => 'Varchar'
 	);
-	
+
 	private static $has_many = array(
 		'Objects' => 'DataDifferencerTest_Object'
 	);
@@ -112,7 +104,7 @@ class DataDifferencerTest_HasOneRelationObject extends DataObject implements Tes
 class DataDifferencerTest_MockImage extends Image implements TestOnly {
 	public function generateFormattedImage($format, $arg1 = null, $arg2 = null) {
 		$cacheFile = $this->cacheFilename($format, $arg1, $arg2);
-		$gd = new GD(Director::baseFolder()."/" . $this->Filename);
+		$gd = new GDBackend(Director::baseFolder()."/" . $this->Filename);
 		// Skip aktual generation
 		return $gd;
 	}

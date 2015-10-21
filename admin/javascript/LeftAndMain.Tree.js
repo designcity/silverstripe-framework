@@ -250,7 +250,7 @@
 			 */
 			createNode: function(html, data, callback) {
 				var self = this, 
-					parentNode = data.ParentID ? self.getNodeByID(data.ParentID) : false,
+					parentNode = data.ParentID !== void 0 ? self.getNodeByID(data.ParentID) : false, // Explicitly check for undefined as 0 is a valid ParentID
 					newNode = $(html);
 				
 				// Extract the state for the new node from the properties taken from the provided HTML template.
@@ -445,7 +445,13 @@
 			 * 	(Array)
 			 */
 			getSelectedIDs: function() {
-				return $.map($(this).jstree('get_checked'), function(el, i) {return $(el).data('id');});
+				return $(this)
+					.jstree('get_checked')
+					.not('.disabled')
+					.map(function() {
+						return $(this).data('id');
+					})
+					.get();
 			}
 		});
 		

@@ -99,14 +99,9 @@ $gf_grid_x:	16px;
 			& > * {
 				margin-right:$gf_grid_x/2;
 				float: left;
-				font-size: $gf_grid_y*1.2;
 			}
 		}
-
-		.ss-gridfield-buttonrow {
-			font-size: $gf_grid_y*1.2;
 	}
-		}
 	
 	.ss-gridfield {
 		.grid-levelup {
@@ -332,10 +327,14 @@ $gf_grid_x:	16px;
 				}			
 			}			
 			&:hover {
-				background: #FFFAD6 !important;
+				background: #FFFAD6;
 			}
 			&:first-child {
 				background: transparent;
+
+				&:hover {
+					background: #FFFAD6;
+				}
 			}
 			&.ss-gridfield-even {
 				background: $gf_colour_zebra;
@@ -343,9 +342,16 @@ $gf_grid_x:	16px;
 				&.ss-gridfield-last {
 					border-bottom: none;
 				}
+				&:hover {
+					background: #FFFAD6;
+				}
 			}
 			&.even {
 				background: $gf_colour_zebra;
+
+				&:hover {
+					background: #FFFAD6;
+				}
 			}
 			
 			th {
@@ -580,6 +586,7 @@ $gf_grid_x:	16px;
 
 				span.non-sortable {
 					display:block;
+					padding: 6px 8px;
 				}
 			}
 
@@ -661,6 +668,19 @@ $gf_grid_x:	16px;
 		}
 		td:last-child{
 			border-right: 1px solid $gf_colour_border;
+		}
+		
+		// Thumbnails e.g. in File admin, UploadField and HtmlEditorField file selection
+		td.col-StripThumbnail {
+			padding: 2px 4px;
+			width: 32px;
+			height: 32px;
+	
+			img {
+				width: 32px;
+				height: 32px;
+				display: block;
+			}
 		}
 	}
 }

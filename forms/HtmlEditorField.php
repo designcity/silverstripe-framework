@@ -29,69 +29,29 @@ class HtmlEditorField extends TextareaField {
 	protected $rows = 30;
 	
 	/**
-	 * Includes the JavaScript neccesary for this field to work using the {@link Requirements} system.
+	 * @deprecated since version 4.0
 	 */
 	public static function include_js() {
-		require_once 'tinymce/tiny_mce_gzip.php';
-
-		$configObj = HtmlEditorConfig::get_active();
-
-		if(Config::inst()->get('HtmlEditorField', 'use_gzip')) {
-			$internalPlugins = array();
-			foreach($configObj->getPlugins() as $plugin => $path) if(!$path) $internalPlugins[] = $plugin;
-			$tag = TinyMCE_Compressor::renderTag(array(
-				'url' => THIRDPARTY_DIR . '/tinymce/tiny_mce_gzip.php',
-				'plugins' => implode(',', $internalPlugins),
-				'themes' => 'advanced',
-				'languages' => $configObj->getOption('language')
-			), true);
-			preg_match('/src="([^"]*)"/', $tag, $matches);
-			Requirements::javascript(html_entity_decode($matches[1]));
-
-		} else {
-			Requirements::javascript(MCE_ROOT . 'tiny_mce_src.js');
-		} 
-
-		Requirements::customScript($configObj->generateJS(), 'htmlEditorConfig');
+		Deprecation::notice('4.0', 'Use HtmlEditorConfig::require_js() instead');
+		HtmlEditorConfig::require_js();
 	}
-	
+
+
+	protected $editorConfig = null;
+
 	/**
+	 * Creates a new HTMLEditorField.
 	 * @see TextareaField::__construct()
-	 */
-	public function __construct($name, $title = null, $value = '') {
+	 *
+	 * @param string $name The internal field name, passed to forms.
+	 * @param string $title The human-readable field label.
+	 * @param mixed $value The value of the field.
+	 * @param string $config HTMLEditorConfig identifier to be used. Default to the active one.
+	 */	
+	public function __construct($name, $title = null, $value = '', $config = null) {
 		parent::__construct($name, $title, $value);
-		
-		self::include_js();
-	}
-	
-	/**
-	 * @return string
-	 */
-	public function Field($properties = array()) {
-		// mark up broken links
-		$value = Injector::inst()->create('HTMLValue', $this->value);
 
-		if($links = $value->getElementsByTagName('a')) foreach($links as $link) {
-			$matches = array();
-			
-			if(preg_match('/\[sitetree_link(?:\s*|%20|,)?id=([0-9]+)\]/i', $link->getAttribute('href'), $matches)) {
-				if(!DataObject::get_by_id('SiteTree', $matches[1])) {
-					$class = $link->getAttribute('class');
-					$link->setAttribute('class', ($class ? "$class ss-broken" : 'ss-broken'));
-				}
-			}
-
-			if(preg_match('/\[file_link(?:\s*|%20|,)?id=([0-9]+)\]/i', $link->getAttribute('href'), $matches)) {
-				if(!DataObject::get_by_id('File', $matches[1])) {
-					$class = $link->getAttribute('class');
-					$link->setAttribute('class', ($class ? "$class ss-broken" : 'ss-broken'));
-				}
-			}
-		}
-
-		$properties['Value'] = htmlentities($value->getContent(), ENT_COMPAT, 'UTF-8');
-
-		return parent::Field($properties);
+		$this->editorConfig = $config ? $config : HtmlEditorConfig::get_active_identifier();
 	}
 
 	public function getAttributes() {
@@ -101,17 +61,18 @@ class HtmlEditorField extends TextareaField {
 				'tinymce' => 'true',
 				'style'   => 'width: 97%; height: ' . ($this->rows * 16) . 'px', // prevents horizontal scrollbars
 				'value' => null,
+				'data-config' => $this->editorConfig
 			)
 		);
 	}
-	
+
 	public function saveInto(DataObjectInterface $record) {
 		if($record->hasField($this->name) && $record->escapeTypeForField($this->name) != 'xml') {
 			throw new Exception (
 				'HtmlEditorField->saveInto(): This field should save into a HTMLText or HTMLVarchar field.'
 			);
 		}
-		
+
 		$htmlValue = Injector::inst()->create('HTMLValue', $this->value);
 
 		// Sanitise if requested
@@ -127,8 +88,8 @@ class HtmlEditorField extends TextareaField {
 
 			// Resample the images if the width & height have changed.
 			if($image = File::find(urldecode(Director::makeRelative($img->getAttribute('src'))))){
-				$width  = $img->getAttribute('width');
-				$height = $img->getAttribute('height');
+				$width  = (int)$img->getAttribute('width');
+				$height = (int)$img->getAttribute('height');
 
 				if($width && $height && ($width != $image->getWidth() || $height != $image->getHeight())) {
 					//Make sure that the resized image actually returns an image:
@@ -140,7 +101,14 @@ class HtmlEditorField extends TextareaField {
 			// Add default empty title & alt attributes.
 			if(!$img->getAttribute('alt')) $img->setAttribute('alt', '');
 			if(!$img->getAttribute('title')) $img->setAttribute('title', '');
+		
+			// Use this extension point to manipulate images inserted using TinyMCE, e.g. add a CSS class, change default title
+			// $image is the image, $img is the DOM model
+			$this->extend('processImage', $image, $img);
 		}
+
+		// optionally manipulate the HTML after a TinyMCE edit and prior to a save
+		$this->extend('processHTML', $htmlValue);
 
 		// Store into record
 		$record->{$this->name} = $htmlValue->getContent();
@@ -152,10 +120,10 @@ class HtmlEditorField extends TextareaField {
 	public function performReadonlyTransformation() {
 		$field = $this->castedCopy('HtmlEditorField_Readonly');
 		$field->dontEscape = true;
-		
+
 		return $field;
 	}
-	
+
 	public function performDisabledTransformation() {
 		return $this->performReadonlyTransformation();
 	}
@@ -181,7 +149,7 @@ class HtmlEditorField_Readonly extends ReadonlyField {
 /**
  * Toolbar shared by all instances of {@link HTMLEditorField}, to avoid too much markup duplication.
  *  Needs to be inserted manually into the template in order to function - see {@link LeftAndMain->EditorToolbar()}.
- * 
+ *
  * @package forms
  * @subpackage fields-formattedinput
  */
@@ -190,7 +158,8 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 	private static $allowed_actions = array(
 		'LinkForm',
 		'MediaForm',
-		'viewfile'
+		'viewfile',
+		'getanchors'
 	);
 
 	/**
@@ -199,7 +168,7 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 	protected $templateViewFile = 'HtmlEditorField_viewfile';
 
 	protected $controller, $name;
-	
+
 	public function __construct($controller, $name) {
 		parent::__construct();
 
@@ -207,10 +176,12 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 		Requirements::javascript(THIRDPARTY_DIR . '/jquery-ui/jquery-ui.js');
 		Requirements::javascript(THIRDPARTY_DIR . '/jquery-entwine/dist/jquery.entwine-dist.js');
 		Requirements::javascript(FRAMEWORK_ADMIN_DIR . '/javascript/ssui.core.js');
+
+		HtmlEditorConfig::require_js();
 		Requirements::javascript(FRAMEWORK_DIR ."/javascript/HtmlEditorField.js");
 
 		Requirements::css(THIRDPARTY_DIR . '/jquery-ui-themes/smoothness/jquery-ui.css');
-		
+
 		$this->controller = $controller;
 		$this->name = $name;
 	}
@@ -225,40 +196,43 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 
 	/**
 	 * Searches the SiteTree for display in the dropdown
-	 *  
+	 *
 	 * @return callback
-	 */	
+	 */
 	public function siteTreeSearchCallback($sourceObject, $labelField, $search) {
-		return DataObject::get($sourceObject, "\"MenuTitle\" LIKE '%$search%' OR \"Title\" LIKE '%$search%'");
+		return DataObject::get($sourceObject)->filterAny(array(
+			'MenuTitle:PartialMatch' => $search,
+			'Title:PartialMatch' => $search
+		));
 	}
-	
+
 	/**
 	 * Return a {@link Form} instance allowing a user to
 	 * add links in the TinyMCE content editor.
-	 *  
+	 *
 	 * @return Form
 	 */
 	public function LinkForm() {
-		$siteTree = new TreeDropdownField('internal', _t('HtmlEditorField.PAGE', "Page"),
+		$siteTree = TreeDropdownField::create('internal', _t('HtmlEditorField.PAGE', "Page"),
 			'SiteTree', 'ID', 'MenuTitle', true);
 		// mimic the SiteTree::getMenuTitle(), which is bypassed when the search is performed
 		$siteTree->setSearchFunction(array($this, 'siteTreeSearchCallback'));
-		
+
 		$numericLabelTmpl = '<span class="step-label"><span class="flyout">%d</span><span class="arrow"></span>'
 			. '<strong class="title">%s</strong></span>';
 		$form = new Form(
 			$this->controller,
-			"{$this->name}/LinkForm", 
+			"{$this->name}/LinkForm",
 			new FieldList(
 				$headerWrap = new CompositeField(
 					new LiteralField(
-						'Heading', 
+						'Heading',
 						sprintf('<h3 class="htmleditorfield-mediaform-heading insert">%s</h3>',
 							_t('HtmlEditorField.LINK', 'Insert Link'))
 					)
 				),
 				$contentComposite = new CompositeField(
-					new OptionsetField(
+					OptionsetField::create(
 						'LinkType',
 						sprintf($numericLabelTmpl, '1', _t('HtmlEditorField.LINKTO', 'Link to')),
 						array(
@@ -270,19 +244,20 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 						),
 						'internal'
 					),
-					new LiteralField('Step2',
+					LiteralField::create('Step2',
 						'<div class="step2">'
 						. sprintf($numericLabelTmpl, '2', _t('HtmlEditorField.DETAILS', 'Details')) . '</div>'
 					),
 					$siteTree,
-					new TextField('external', _t('HtmlEditorField.URL', 'URL'), 'http://'),
-					new EmailField('email', _t('HtmlEditorField.EMAIL', 'Email address')),
-					new TreeDropdownField('file', _t('HtmlEditorField.FILE', 'File'), 'File', 'ID', 'Title', true),
-					new TextField('Anchor', _t('HtmlEditorField.ANCHORVALUE', 'Anchor')),
-					new TextField('Description', _t('HtmlEditorField.LINKDESCR', 'Link description')),
-					new CheckboxField('TargetBlank',
+					TextField::create('external', _t('HtmlEditorField.URL', 'URL'), 'http://'),
+					EmailField::create('email', _t('HtmlEditorField.EMAIL', 'Email address')),
+					$fileField = UploadField::create('file', _t('HtmlEditorField.FILE', 'File')),
+					TextField::create('Anchor', _t('HtmlEditorField.ANCHORVALUE', 'Anchor')),
+					TextField::create('Subject', _t('HtmlEditorField.SUBJECT', 'Email subject')),
+					TextField::create('Description', _t('HtmlEditorField.LINKDESCR', 'Link description')),
+					CheckboxField::create('TargetBlank',
 						_t('HtmlEditorField.LINKOPENNEWWIN', 'Open link in a new window?')),
-					new HiddenField('Locale', null, $this->controller->Locale)
+					HiddenField::create('Locale', null, $this->controller->Locale)
 				)
 			),
 			new FieldList(
@@ -297,34 +272,46 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 			)
 		);
 
-		$headerWrap->addExtraClass('CompositeField composite cms-content-header nolabel ');		
+		$headerWrap->addExtraClass('CompositeField composite cms-content-header nolabel ');
 		$contentComposite->addExtraClass('ss-insert-link content');
-		
+		$fileField->setAllowedMaxFileNumber(1);
+
 		$form->unsetValidator();
 		$form->loadDataFrom($this);
 		$form->addExtraClass('htmleditorfield-form htmleditorfield-linkform cms-dialog-content');
-		
+
 		$this->extend('updateLinkForm', $form);
-		
+
 		return $form;
+	}
+
+	/**
+	 * Get the folder ID to filter files by for the "from cms" tab
+	 *
+	 * @return int
+	 */
+	protected function getAttachParentID() {
+		$parentID = $this->controller->getRequest()->requestVar('ParentID');
+		$this->extend('updateAttachParentID', $parentID);
+		return $parentID;
 	}
 
 	/**
 	 * Return a {@link Form} instance allowing a user to
 	 * add images and flash objects to the TinyMCE content editor.
-	 *  
+	 *
 	 * @return Form
 	 */
 	public function MediaForm() {
 		// TODO Handle through GridState within field - currently this state set too late to be useful here (during
 		// request handling)
-		$parentID = $this->controller->getRequest()->requestVar('ParentID');
+		$parentID = $this->getAttachParentID();
 
 		$fileFieldConfig = GridFieldConfig::create()->addComponents(
 			new GridFieldFilterHeader(),
 			new GridFieldSortableHeader(),
 			new GridFieldDataColumns(),
-			new GridFieldPaginator(5),
+			new GridFieldPaginator(7),
 			// TODO Shouldn't allow delete here, its too confusing with a "remove from editor view" action.
 			// Remove once we can fit the search button in the last actual title column
 			new GridFieldDeleteAction(),
@@ -336,20 +323,26 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 		$fileField->setAttribute('data-multiselect', true);
 		$columns = $fileField->getConfig()->getComponentByType('GridFieldDataColumns');
 		$columns->setDisplayFields(array(
-			'CMSThumbnail' => false,
-			'Name' => _t('File.Name'),
+			'StripThumbnail' => false,
+			'Title' => _t('File.Title'),
+			'Created' => singleton('File')->fieldLabel('Created'),
 		));
-		
+		$columns->setFieldCasting(array(
+			'Created' => 'SS_Datetime->Nice'
+		));
+
 		$numericLabelTmpl = '<span class="step-label"><span class="flyout">%d</span><span class="arrow"></span>'
 			. '<strong class="title">%s</strong></span>';
 
 		$fromCMS = new CompositeField(
-			new LiteralField('headerSelect', 
+			new LiteralField('headerSelect',
 				'<h4>'.sprintf($numericLabelTmpl, '1', _t('HtmlEditorField.FindInFolder', 'Find in Folder')).'</h4>'),
-			$select = TreeDropdownField::create('ParentID', "", 'Folder')->addExtraClass('noborder'),	
+			$select = TreeDropdownField::create('ParentID', "", 'Folder')
+				->addExtraClass('noborder')
+				->setValue($parentID),
 			$fileField
 		);
-		
+
 		$fromCMS->addExtraClass('content ss-uploadfield');
 		$select->addExtraClass('content-select');
 
@@ -423,7 +416,7 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 			$headings,
 			$allFields
 		);
-		
+
 		$actions = new FieldList(
 			FormAction::create('insertmedia', _t('HtmlEditorField.BUTTONINSERT', 'Insert'))
 				->addExtraClass('ss-ui-action-constructive media-insert')
@@ -441,7 +434,7 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 			$fields,
 			$actions
 		);
-		
+
 
 		$form->unsetValidator();
 		$form->disableSecurityToken();
@@ -450,9 +443,9 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 		// TODO Re-enable once we remove $.metadata dependency which currently breaks the JS due to $.ui.widget
 		// $form->setAttribute('data-urlViewfile', $this->controller->Link($this->name));
 
-		// Allow other people to extend the fields being added to the imageform 
+		// Allow other people to extend the fields being added to the imageform
 		$this->extend('updateMediaForm', $form);
-		
+
 		return $form;
 	}
 
@@ -469,15 +462,15 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 				$file = new File(array(
 					'Title' => basename($url),
 					'Filename' => $url
-				));	
+				));
 			} else {
 				$url = Director::makeRelative($request->getVar('FileURL'));
 				$url = preg_replace('/_resampled\/[^-]+-/', '', $url);
-				$file = File::get()->filter('Filename', $url)->first();	
+				$file = File::get()->filter('Filename', $url)->first();
 				if(!$file) $file = new File(array(
 					'Title' => basename($url),
 					'Filename' => $url
-				));	
+				));
 			}
 		} elseif($id = $request->getVar('ID')) {
 			$file = DataObject::get_by_id('File', $id);
@@ -506,10 +499,45 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 	}
 
 	/**
+	 * Find all anchors available on the given page.
+	 *
+	 * @return array
+	 */
+	public function getanchors() {
+		$id = (int)$this->getRequest()->getVar('PageID');
+		$anchors = array();
+
+		if (($page = Page::get()->byID($id)) && !empty($page)) {
+			if (!$page->canView()) {
+				throw new SS_HTTPResponse_Exception(
+					_t(
+						'HtmlEditorField.ANCHORSCANNOTACCESSPAGE',
+						'You are not permitted to access the content of the target page.'
+					),
+					403
+				);
+			}
+
+			// Similar to the regex found in HtmlEditorField.js / getAnchors method.
+			if (preg_match_all("/name=\"([^\"]+?)\"|name='([^']+?)'/im", $page->Content, $matches)) {
+				$anchors = $matches[1];
+			}
+
+		} else {
+			throw new SS_HTTPResponse_Exception(
+				_t('HtmlEditorField.ANCHORSPAGENOTFOUND', 'Target page not found.'),
+				404
+			);
+		}
+
+		return json_encode($anchors);
+	}
+
+	/**
 	 * Similar to {@link File->getCMSFields()}, but only returns fields
 	 * for manipulating the instance of the file as inserted into the HTML content,
 	 * not the "master record" in the database - hence there's no form or saving logic.
-	 * 
+	 *
 	 * @param String Relative or absolute URL to file
 	 * @return FieldList
 	 */
@@ -602,16 +630,16 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 		$urlField->dontEscape = true;
 
 		if($file->Type == 'photo') {
-			$fields->insertBefore(new TextField(
+			$fields->insertBefore('CaptionText', new TextField(
 				'AltText',
-				_t('HtmlEditorField.IMAGEALTTEXT', 'Alternative text (alt) - shown if image cannot be displayed'),
+				_t('HtmlEditorField.IMAGEALTTEXT', 'Alternative text (alt) - shown if image can\'t be displayed'),
 				$file->Title,
 				80
-			), 'CaptionText');
-			$fields->insertBefore(new TextField(
+			));
+			$fields->insertBefore('CaptionText', new TextField(
 				'Title',
 				_t('HtmlEditorField.IMAGETITLE', 'Title text (tooltip) - for additional information about the image')
-			), 'CaptionText');
+			));
 		}
 
 		$this->extend('updateFieldsForOembed', $fields, $url, $file);
@@ -649,7 +677,7 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 	 */
 	protected function getFieldsForImage($url, $file) {
 		if($file->File instanceof Image) {
-			$formattedImage = $file->File->generateFormattedImage('SetWidth',
+			$formattedImage = $file->File->generateFormattedImage('ScaleWidth',
 				Config::inst()->get('Image', 'asset_preview_width'));
 			$thumbnailURL = Convert::raw2att($formattedImage ? $formattedImage->URL : $url);
 		} else {
@@ -695,7 +723,7 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 				$file->Title,
 				80
 			)->setDescription(
-				_t('HtmlEditorField.IMAGEALTTEXTDESC', 'Shown to screen readers or if image can not be displayed')),
+				_t('HtmlEditorField.IMAGEALTTEXTDESC', 'Shown to screen readers or if image can\'t be displayed')),
 
 			TextField::create(
 				'Title',
@@ -744,13 +772,10 @@ class HtmlEditorField_Toolbar extends RequestHandler {
 	 * @return DataList
 	 */
 	protected function getFiles($parentID = null) {
-		// TODO Use array('Filename:EndsWith' => $exts) once that's supported
 		$exts = $this->getAllowedExtensions();
-		$wheres = array();
-		foreach($exts as $ext) $wheres[] = '"Filename" LIKE \'%.' . $ext . '\'';
+		$dotExts = array_map(function($ext) { return ".{$ext}"; }, $exts);
+		$files = File::get()->filter('Filename:EndsWith', $dotExts);
 
-		$files = File::get()->where(implode(' OR ', $wheres));
-		
 		// Limit by folder (if required)
 		if($parentID) {
 			$files = $files->filter('ParentID', $parentID);
@@ -794,7 +819,7 @@ class HtmlEditorField_File extends ViewableData {
 
 	/**
 	 * @param String
-	 * @param File 
+	 * @param File
 	 */
 	public function __construct($url, $file = null) {
 		$this->url = $url;
@@ -941,7 +966,7 @@ class HtmlEditorField_Embed extends HtmlEditorField_File {
 	public function appCategory() {
 		return 'embed';
 	}
-	
+
 	public function getInfo() {
 		return $this->oembed->info;
 	}
@@ -980,7 +1005,7 @@ class HtmlEditorField_Image extends HtmlEditorField_File {
 
 	/**
 	 * Provide an initial width for inserted image, restricted based on $embed_width
-	 * 
+	 *
 	 * @return int
 	 */
 	public function getInsertWidth() {
@@ -991,7 +1016,7 @@ class HtmlEditorField_Image extends HtmlEditorField_File {
 
 	/**
 	 * Provide an initial height for inserted image, scaled proportionally to the initial width
-	 * 
+	 *
 	 * @return int
 	 */
 	public function getInsertHeight() {

@@ -73,7 +73,7 @@ class Aggregate extends ViewableData {
 	 * @param string $filter (optional) An SQL filter to apply to the selected rows before calculating the aggregate
 	 */
 	public function __construct($type, $filter = '') {
-		Deprecation::notice('3.1', 'Call aggregate methods on a DataList directly instead. In templates'
+		Deprecation::notice('4.0', 'Call aggregate methods on a DataList directly instead. In templates'
 			. ' an example of the new syntax is &lt% cached List(Member).max(LastEdited) %&gt instead'
 			. ' (check partial-caching.md documentation for more details.)');
 		$this->type = $type;
@@ -82,10 +82,10 @@ class Aggregate extends ViewableData {
 	}
 
 	/**
-	 * Build the SQLQuery to calculate the aggregate
+	 * Build the SQLSelect to calculate the aggregate
 	 * This is a seperate function so that subtypes of Aggregate can change just this bit
 	 * @param string $attr - the SQL field statement for selection (i.e. "MAX(LastUpdated)")
-	 * @return SQLQuery
+	 * @return SQLSelect
 	 */
 	protected function query($attr) {
 		$query = DataList::create($this->type)->where($this->filter);
@@ -108,7 +108,7 @@ class Aggregate extends ViewableData {
 		$table = null;
 		
 		foreach (ClassInfo::ancestry($this->type, true) as $class) {
-			$fields = DataObject::database_fields($class);
+			$fields = DataObject::database_fields($class, false);
 			if (array_key_exists($attribute, $fields)) { $table = $class; break; }
 		}
 		
@@ -117,7 +117,8 @@ class Aggregate extends ViewableData {
 		$query = $this->query("$func(\"$table\".\"$attribute\")");
 		
 		// Cache results of this specific SQL query until flushCache() is triggered.
-		$cachekey = sha1($query->sql());
+		$sql = $query->sql($parameters);
+		$cachekey = sha1($sql.'-'.var_export($parameters, true));
 		$cache = self::cache();
 		
 		if (!($result = $cache->load($cachekey))) {
@@ -138,6 +139,8 @@ class Aggregate extends ViewableData {
 
 /**
  * A subclass of Aggregate that calculates aggregates for the result of a has_many query.
+ *
+ * @deprecated
  * 
  * @author hfried
  * @package framework

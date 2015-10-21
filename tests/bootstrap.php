@@ -1,6 +1,6 @@
 <?php
 
-/** 
+/**
  * This bootstraps the SilverStripe system so that phpunit can be run directly on SilverStripe tests.
  */
 
@@ -21,7 +21,7 @@ $frameworkPath = dirname(dirname(__FILE__));
 $frameworkDir = basename($frameworkPath);
 
 $_SERVER['SCRIPT_FILENAME'] = $frameworkPath . DIRECTORY_SEPARATOR . 'cli-script.php';
-$_SERVER['SCRIPT_NAME'] = '.' . DIRECTORY_SEPARATOR . $frameworkDir . DIRECTORY_SEPARATOR . 'cli-script.php'; 
+$_SERVER['SCRIPT_NAME'] = '.' . DIRECTORY_SEPARATOR . $frameworkDir . DIRECTORY_SEPARATOR . 'cli-script.php';
 
 if(!defined('BASE_PATH')) define('BASE_PATH', dirname($frameworkPath));
 
@@ -52,7 +52,7 @@ DB::connect($databaseConfig);
 // Now set a fake REQUEST_URI
 $_SERVER['REQUEST_URI'] = BASE_URL . '/dev';
 
-// Fake a session 
+// Fake a session
 $_SESSION = null;
 
 // Prepare manifest autoloader
@@ -66,10 +66,3 @@ SapphireTest::set_is_running_test(true);
 // Remove the error handler so that PHPUnit can add its own
 restore_error_handler();
 
-if(!isset($_GET['flush']) || !$_GET['flush']) {
-	Debug::message(
-		"WARNING: Manifest not flushed. " .
-		"Add flush=1 as an argument to discover new classes or files.\n",
-		false
-	);
-}

@@ -179,18 +179,14 @@
 			 * Store the preview options for this page.
 			 */
 			saveState : function(name, value) {
-				if(!window.localStorage) return;
-				
-				window.localStorage.setItem('cms-preview-state-' + name, value);
+				if(this._supportsLocalStorage()) window.localStorage.setItem('cms-preview-state-' + name, value);
 			},
 
 			/**
 			 * Load previously stored preferences
 			 */
 			loadState : function(name) {
-				if(!window.localStorage) return;
-				
-				return window.localStorage.getItem('cms-preview-state-' + name);
+				if(this._supportsLocalStorage()) return window.localStorage.getItem('cms-preview-state-' + name);
 			}, 
 
 			/**
@@ -276,6 +272,23 @@
 
 				this._super();
 			},
+			
+			/**
+			* Detect and use localStorage if available. In IE11 windows 8.1 call to window.localStorage was throwing out an access denied error in some cases which was causing the preview window not to display correctly in the CMS admin area.
+			*/
+			_supportsLocalStorage: function() {
+				var uid = new Date;
+				var storage;
+				var result;
+				try {
+					(storage = window.localStorage).setItem(uid, uid);
+					result = storage.getItem(uid) == uid;
+					storage.removeItem(uid);
+					return result && storage;
+				} catch (exception) {
+					console.warn('localStorge is not available due to current browser / system settings.');
+				}
+			},
 
 			/**
 			 * Set the preview to unavailable - could be still visible. This is purely visual.
@@ -326,7 +339,10 @@
 			 * Update preview whenever any panels are reloaded.
 			 */
 			'from .cms-container': {
-				onafterstatechange: function(){
+				onafterstatechange: function(e, data) {
+					// Don't update preview if we're dealing with a custom redirect
+					if(data.xhr.getResponseHeader('X-ControllerURL')) return;
+
 					this._initialiseFromContent();
 				}
 			},
@@ -517,7 +533,8 @@
 		});
 
 		$('.cms-edit-form').entwine({
-			onadd: function() {	
+			onadd: function() {
+				this._super();
 				$('.cms-preview')._initialiseFromContent();
 			}
 		});
