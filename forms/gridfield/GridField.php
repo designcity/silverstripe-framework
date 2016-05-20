@@ -149,7 +149,7 @@ class GridField extends FormField {
 			return $this->modelClassName;
 		}
 
-		if($this->list && method_exists($this->list, 'dataClass')) {
+		if($this->list && $this->list->hasMethod('dataClass')) {
 			$class = $this->list->dataClass();
 
 			if($class) {
@@ -833,6 +833,18 @@ class GridField extends FormField {
 	 */
 	public function gridFieldAlterAction($data, $form, SS_HTTPRequest $request) {
 		$data = $request->requestVars();
+
+		// Protection against CSRF attacks
+		$token = $this
+			->getForm()
+			->getSecurityToken();
+		if(!$token->checkRequest($request)) {
+			$this->httpError(400, _t("Form.CSRF_FAILED_MESSAGE",
+				"There seems to have been a technical problem. Please click the back button, ".
+				"refresh your browser, and try again."
+			));
+		}
+
 		$name = $this->getName();
 
 		$fieldData = null;

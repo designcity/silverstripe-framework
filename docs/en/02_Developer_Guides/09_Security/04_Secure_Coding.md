@@ -110,12 +110,12 @@ Example:
 
 	:::php
 	class MyForm extends Form {
-		public function save($RAW_data, $form) {
+	  public function save($RAW_data, $form) {
 			// Pass true as the second parameter of raw2sql to quote the value safely
 			$SQL_data = Convert::raw2sql($RAW_data, true); // works recursively on an array
 			$objs = Player::get()->where("Name = " . $SQL_data['name']);
-			// ...
-		}
+	    // ...
+	  }
 	}
 
 
@@ -126,13 +126,13 @@ Example:
 
 	:::php
 	class MyController extends Controller {
-		private static $allowed_actions = array('myurlaction');
-		public function myurlaction($RAW_urlParams) {
+	  private static $allowed_actions = array('myurlaction');
+	  public function myurlaction($RAW_urlParams) {
 			// Pass true as the second parameter of raw2sql to quote the value safely
 			$SQL_urlParams = Convert::raw2sql($RAW_urlParams, true); // works recursively on an array
 			$objs = Player::get()->where("Name = " . $SQL_data['OtherID']);
-			// ...
-		}
+	    // ...
+	  }
 	}
 
 
@@ -142,18 +142,18 @@ passing data through, escaping should happen at the end of the chain.
 
 	:::php
 	class MyController extends Controller {
-		/**
-		 * @param array $RAW_data All names in an indexed array (not SQL-safe)
-		 */
-		public function saveAllNames($RAW_data) {
-			// $SQL_data = Convert::raw2sql($RAW_data); // premature escaping
-			foreach($RAW_data as $item) $this->saveName($item);
-		}
-
-		public function saveName($RAW_name) {
+	  /**
+	   * @param array $RAW_data All names in an indexed array (not SQL-safe)
+	   */
+	  public function saveAllNames($RAW_data) {
+	    // $SQL_data = Convert::raw2sql($RAW_data); // premature escaping
+	    foreach($RAW_data as $item) $this->saveName($item);
+	  }
+	
+	  public function saveName($RAW_name) {
 			$SQL_name = Convert::raw2sql($RAW_name, true);
 			DB::query("UPDATE Player SET Name = {$SQL_name}");
-		}
+	  }
 	}
 
 This might not be applicable in all cases - especially if you are building an API thats likely to be customized. If
@@ -220,10 +220,10 @@ PHP:
 
 	:::php
 	class MyObject extends DataObject {
-		private static $db = array(
-			'MyEscapedValue' => 'Text', // Example value: <b>not bold</b>
-			'MyUnescapedValue' => 'HTMLText' // Example value: <b>bold</b>
-		);
+	  private static $db = array(
+	    'MyEscapedValue' => 'Text', // Example value: <b>not bold</b>
+	    'MyUnescapedValue' => 'HTMLText' // Example value: <b>bold</b>
+	  );
 	}
 
 
@@ -231,8 +231,8 @@ Template:
 
 	:::php
 	<ul>
-		<li>$MyEscapedValue</li> // output: &lt;b&gt;not bold&lt;b&gt;
-		<li>$MyUnescapedValue</li> // output: <b>bold</b>
+	  <li>$MyEscapedValue</li> // output: &lt;b&gt;not bold&lt;b&gt;
+	  <li>$MyUnescapedValue</li> // output: <b>bold</b>
 	</ul>
 
 
@@ -248,11 +248,11 @@ Template (see above):
 
 	:::php
 	<ul>
-		// output: <a href="#" title="foo &amp; &#quot;bar&quot;">foo &amp; "bar"</a>
-		<li><a href="#" title="$Title.ATT">$Title</a></li>
-		<li>$MyEscapedValue</li> // output: &lt;b&gt;not bold&lt;b&gt;
-		<li>$MyUnescapedValue</li> // output: <b>bold</b>
-		<li>$MyUnescapedValue.XML</li> // output: &lt;b&gt;bold&lt;b&gt;
+	  // output: <a href="#" title="foo &amp; &#quot;bar&quot;">foo &amp; "bar"</a>
+	  <li><a href="#" title="$Title.ATT">$Title</a></li>
+	  <li>$MyEscapedValue</li> // output: &lt;b&gt;not bold&lt;b&gt;
+	  <li>$MyUnescapedValue</li> // output: <b>bold</b>
+	  <li>$MyUnescapedValue.XML</li> // output: &lt;b&gt;bold&lt;b&gt;
 	</ul>
 
 
@@ -266,7 +266,7 @@ PHP:
 	:::php
 	class MyObject extends DataObject {
 		public $Title = '<b>not bold</b>'; // will be escaped due to Text casting
-		
+	     
 		$casting = array(
 			"Title" => "Text", // forcing a casting
 			'TitleWithHTMLSuffix' => 'HTMLText' // optional, as HTMLText is the default casting
@@ -283,9 +283,9 @@ Template:
 
 	:::php
 	<ul>
-		<li>$Title</li> // output: &lt;b&gt;not bold&lt;b&gt;
-		<li>$Title.RAW</li> // output: <b>not bold</b>
-		<li>$TitleWithHTMLSuffix</li> // output: <b>not bold</b>: <small>(...)</small>
+	  <li>$Title</li> // output: &lt;b&gt;not bold&lt;b&gt;
+	  <li>$Title.RAW</li> // output: <b>not bold</b>
+	  <li>$TitleWithHTMLSuffix</li> // output: <b>not bold</b>: <small>(...)</small>
 	</ul>
 
 
@@ -398,17 +398,17 @@ Below is an example with different ways you would use this casting technique:
 	:::php
 	public function CaseStudies() {
 	
-		// cast an ID from URL parameters e.g. (mysite.com/home/action/ID)
-		$anotherID = (int)Director::urlParam['ID'];
-
-		// perform a calculation, the prerequisite being $anotherID must be an integer
-		$calc = $anotherID + (5 - 2) / 2;
-
-		// cast the 'category' GET variable as an integer
-		$categoryID = (int)$_GET['category'];
-
-		// perform a byID(), which ensures the ID is an integer before querying
-		return CaseStudy::get()->byID($categoryID);
+	   // cast an ID from URL parameters e.g. (mysite.com/home/action/ID)
+	   $anotherID = (int)Director::urlParam['ID'];
+	
+	   // perform a calculation, the prerequisite being $anotherID must be an integer
+	   $calc = $anotherID + (5 - 2) / 2;
+	
+	   // cast the 'category' GET variable as an integer
+	   $categoryID = (int)$_GET['category'];
+	
+	   // perform a byID(), which ensures the ID is an integer before querying
+	   return CaseStudy::get()->byID($categoryID);
 	}
 
 
@@ -439,10 +439,10 @@ disallow certain filetypes.
 Example configuration for Apache2:
 
 	<VirtualHost *:80>
-		<LocationMatch assets/>
-			php_flag engine off
-			Options -ExecCGI -Includes -Indexes
-		</LocationMatch>
+	  <LocationMatch assets/>
+	    php_flag engine off
+	    Options -ExecCGI -Includes -Indexes
+	  </LocationMatch>
 	</VirtualHost>
 
 
@@ -543,7 +543,7 @@ controller's `init()` method:
 	class MyController extends Controller {
 		public function init() {
 			parent::init();
-			$this->response->addHeader('X-Frame-Options', 'SAMEORIGIN');
+			$this->getResponse()->addHeader('X-Frame-Options', 'SAMEORIGIN');
 		}
 	}
 	
@@ -580,7 +580,11 @@ server IPs using the SS_TRUSTED_PROXY_IPS define in your _ss_environment.php.
 
 	:::php
 	define('SS_TRUSTED_PROXY_IPS', '127.0.0.1,192.168.0.1');
+	define('SS_TRUSTED_PROXY_HOST_HEADER', 'HTTP_X_FORWARDED_HOST');
+	define('SS_TRUSTED_PROXY_IP_HEADER', 'HTTP_X_FORWARDED_FOR');
+	define('SS_TRUSTED_PROXY_PROTOCOL_HEADER', 'HTTP_X_FORWARDED_PROTOCOL');
 
+At the same time, you'll also need to define which headers you trust from these proxy IPs. Since there are multiple ways through which proxies can pass through HTTP information on the original hostname, IP and protocol, these values need to be adjusted for your specific proxy. The header names match their equivalent `$_SERVER` values.
 
 If there is no proxy server, 'none' can be used to distrust all clients.
 If only trusted servers will make requests then you can use '*' to trust all clients.
@@ -602,7 +606,6 @@ following in your .htaccess to ensure this behaviour is activated.
 In a future release this behaviour will be changed to be on by default, and this environment
 variable will be no longer necessary, thus it will be necessary to always set
 SS_TRUSTED_PROXY_IPS if using a proxy.
-
 
 ##  Related
 
