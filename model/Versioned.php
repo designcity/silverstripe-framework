@@ -795,9 +795,14 @@ class Versioned extends DataExtension implements TemplateGlobalProvider {
 			return true;
 		}
 
+		// If there are less than 2 stages, we can exit early since comparing stages is not needed
+		if(count($this->stages) < 2){
+			return true;
+		}
+
 		// If we weren't definitely loaded from live, and we can't view non-live content, we need to
-		// check to make sure this version is the live version and so can be viewed
-		$latestVersion = Versioned::get_versionnumber_by_stage($this->owner->class, 'Live', $this->owner->ID);
+		// check to make sure this version is the live version and so can be viewed.
+		$latestVersion = Versioned::get_versionnumber_by_stage($this->owner->class, $this->liveStage, $this->owner->ID);
 		if ($latestVersion == $this->owner->Version) {
 			// Even if this is loaded from a non-live stage, this is the live version
 			return true;
@@ -1446,8 +1451,11 @@ class Versioned extends DataExtension implements TemplateGlobalProvider {
 	 */
 	public function isLatestVersion() {
 		$version = self::get_latest_version($this->owner->class, $this->owner->ID);
-
+		if($version) {
 		return ($version->Version == $this->owner->Version);
+	}
+
+		return false;
 	}
 
 	/**
