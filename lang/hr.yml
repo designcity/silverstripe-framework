@@ -23,7 +23,6 @@ hr:
     FROMCOMPUTER: 'Odaberite datoteke sa svog računala'
     FROMCOMPUTERINFO: 'Uploadajte sa svog računala'
     TOTAL: Ukupno
-    TOUPLOAD: 'Odaberite datoteke za upload...'
     UPLOADINPROGRESS: 'Molim pričekajte... upload u tijeku'
     UPLOADOR: ILI
   BBCodeParser:
@@ -80,6 +79,7 @@ hr:
     TEXT2: 'link za resetiranje lozinke'
     TEXT3: za
   Form:
+    SubmitBtnLabel: Kreni
     VALIDATIONNOTUNIQUE: 'Unešena vrijednost nije unikatna'
     VALIDATIONPASSWORDSDONTMATCH: 'Lozinke se ne slažu'
     VALIDATIONPASSWORDSNOTEMPTY: 'Lozinke moraju imati najmanje jedan broj i jedan alfanumerički znak'

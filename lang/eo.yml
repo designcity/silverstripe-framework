@@ -1,5 +1,7 @@
 eo:
   AssetAdmin:
+    ALLOWEDEXTS: 'Permesitaj alŝutaj dosieraj sufiksoj'
+    HIDEALLOWEDEXTS: 'Kaŝi permesitajn sufiksojn'
     NEWFOLDER: Nova dosierujo
     SHOWALLOWEDEXTS: 'Vidigi permesitajn sufiksojn'
   AssetTableField:
@@ -7,12 +9,14 @@ eo:
     DIM: Dimensioj
     FILENAME: Nomo de dosiero
     FOLDER: Dosierujo
+    HEIGHT: Alto
     LASTEDIT: 'Laste ŝanĝita'
     OWNER: Posedanto
     SIZE: 'Grando'
     TITLE: Titolo
     TYPE: 'Tipo'
     URL: URL
+    WIDTH: Larĝo
   AssetUploadField:
     ChooseFiles: 'Elekti dosierojn'
     DRAGFILESHERE: 'Ŝovi dosieron ĉi tien'
@@ -23,6 +27,8 @@ eo:
     FILES: Dosieroj
     FROMCOMPUTER: 'Elekti dosierojn el via komputilo'
     FROMCOMPUTERINFO: 'Alŝuti el via komputilo'
+    INSERTURL: 'Enigi el URL'
+    REMOVEINFO: 'Forigi ĉi tiun dosieron el ĉi tiu kampo'
     TOTAL: Totalo
     TOUPLOAD: 'Elekti dosierojn alŝutotajn...'
     UPLOADINPROGRESS: 'Bonvolu atendi...alŝuto daŭras'
@@ -77,6 +83,8 @@ eo:
     PASSWORDEXPIRED: '<p>Via pasvorto finiĝis. <a target="_top" href="{link}">Bonvolu elekti novan.</a></p>'
   CMSPageHistoryController_versions_ss:
     PREVIEW: 'Antaŭvido de retejo'
+  CMSPagesController_Tools_ss:
+    FILTER: Filtrilo
   CMSProfileController:
     MENUTITLE: 'Mia agordaro'
   CMSSecurity:
@@ -105,6 +113,7 @@ eo:
     MAXIMUM: 'Pasvorto devas esti ne pli ol {min} signojn longa.'
     SHOWONCLICKTITLE: 'Ŝangi Pasvorton'
   ContentController:
+    DRAFT_SITE_ACCESS_RESTRICTION: 'Vi devas ensaluti per via CMS-pasvorto por vidi la projektan aŭ enarkivigitan enhavon.  <a href="%s">Alklaku ĉi tie por reiri al la publika retejo.</a>'
     NOTLOGGEDIN: 'Ne ensalutis'
   CreditCardField:
     FIRST: unuan
@@ -298,7 +307,7 @@ eo:
     IMAGETITLETEXT: 'Teksto de titolo (ŝpruchelpilo)'
     IMAGETITLETEXTDESC: 'Por plua informo pri la bildo'
     IMAGEWIDTHPX: Larĝo
-    INSERTMEDIA: 'Enmeti memorilon'
+    INSERTMEDIA: 'Enigi registraĵojn'
     LINK: 'Ligilo'
     LINKANCHOR: 'Ankri al ĉi tiu paĝo'
     LINKDESCR: 'Ligila priskribo'
@@ -311,8 +320,9 @@ eo:
     PAGE: Paĝo
     SUBJECT: 'Temo de retpoŝto'
     URL: URL
+    URLDESCRIPTION: 'Enigu videojn kaj bildojn el la TTT en vian paĝon simple enigante la URL de la dosiero. Certigu ke vi havas permesojn antaŭ ol kunhavigi registraĵojn rekte el la TTT.<br /><br />Bonvolu noti ke dosieroj ne aldoniĝas al la konservejo de dosieroj de la CMS sed dosieroj enkorpiĝas el ties origina loko. Se ial la dosiero ne plu haveblas en ĝia origina loko, ĝi ne plu estos videbla en ĉi tiu paĝo.'
     URLNOTANOEMBEDRESOURCE: 'La URL ''{url}'' ne estas konvertebla al memorilo.'
-    UpdateMEDIA: 'Ĝisdatigi memorilon'
+    UpdateMEDIA: 'Ĝisdatigi registraĵojn'
   Image:
     PLURALNAME: Dosieroj
     SINGULARNAME: Dosiero
@@ -324,7 +334,6 @@ eo:
   LeftAndMain:
     CANT_REORGANISE: 'Vi ne rajtas ŝanĝi supronivelajn paĝojn. Via ŝanĝo ne konserviĝis.'
     DELETED: Forigita.
-    DropdownBatchActionsDefault: Agoj
     HELP: Helpo
     PERMAGAIN: 'Vin adiaŭis la CMS. Se vi volas denove saluti, enigu salutnomon kaj pasvorton malsupre.'
     PERMALREADY: 'Bedaŭrinde vi ne povas aliri tiun parton de la CMS. Se vi volas ensaluti kiel aliulo, faru tion sube.'

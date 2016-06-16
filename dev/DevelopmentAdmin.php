@@ -14,7 +14,7 @@
  * @subpackage dev
  */
 class DevelopmentAdmin extends Controller {
-
+	
 	private static $url_handlers = array(
 		'' => 'index',
 		'build/defaults' => 'buildDefaults',
@@ -28,24 +28,26 @@ class DevelopmentAdmin extends Controller {
 		'runRegisteredController',
 		'generatesecuretoken',
 	);
+	
 
 	public function init() {
 		parent::init();
-
+		
 		// Special case for dev/build: Defer permission checks to DatabaseAdmin->init() (see #4957)
-		$requestedDevBuild = (stripos($this->getRequest()->getURL(), 'dev/build') === 0);
+		$requestedDevBuild = (stripos($this->getRequest()->getURL(), 'dev/build') === 0)
+			&& (stripos($this->getRequest()->getURL(), 'dev/build/defaults') === false);
 
 		// We allow access to this controller regardless of live-status or ADMIN permission only
 		// if on CLI.  Access to this controller is always allowed in "dev-mode", or of the user is ADMIN.
 		$canAccess = (
-			$requestedDevBuild
-			|| Director::isDev()
-			|| Director::is_cli()
+			$requestedDevBuild 
+			|| Director::isDev() 
+			|| Director::is_cli() 
 			// Its important that we don't run this check if dev/build was requested
 			|| Permission::check("ADMIN")
 		);
 		if(!$canAccess) return Security::permissionFailure($this);
-
+		
 		// check for valid url mapping
 		// lacking this information can cause really nasty bugs,
 		// e.g. when running Director::test() from a FunctionalTest instance
@@ -71,13 +73,13 @@ class DevelopmentAdmin extends Controller {
 					'your _ss_environment.php as instructed on the "sake" page of the doc.silverstripe.org wiki'."\n";
 			}
 		}
-
+		
 		// Backwards compat: Default to "draft" stage, which is important
 		// for tasks like dev/build which call DataObject->requireDefaultRecords(),
 		// but also for other administrative tasks which have assumptions about the default stage.
 		Versioned::reading_stage('Stage');
 	}
-
+	
 	public function index() {
 		// Web mode
 		if(!Director::is_cli()) {
@@ -95,7 +97,7 @@ class DevelopmentAdmin extends Controller {
 			}
 
 			$renderer->writeFooter();
-
+		
 		// CLI mode
 		} else {
 			echo "SILVERSTRIPE DEVELOPMENT TOOLS\n--------------------------\n\n";
@@ -106,7 +108,7 @@ class DevelopmentAdmin extends Controller {
 			echo "\n\n";
 		}
 	}
-
+	
 	public function runRegisteredController(SS_HTTPRequest $request){
 		$controllerClass = null;
 		
@@ -128,14 +130,14 @@ class DevelopmentAdmin extends Controller {
 			$this->httpError(500, $msg);
 		}
 	}
-
+	
 	
 	
 	
 	/*
 	 * Internal methods
 	 */
-
+	
 	/**
 	 * @return array of url => description
 	 */
@@ -150,7 +152,7 @@ class DevelopmentAdmin extends Controller {
 		}
 		return $links;
 	}
-
+	
 	protected function getRegisteredController($baseUrlPart){
 		$reg = Config::inst()->get(__CLASS__, 'registered_controllers');
 		
@@ -205,7 +207,7 @@ Generated new token. Please add the following code to your YAML configuration:
 
 Security:
   token: $token
-
+				
 TXT;
 		$response = new SS_HTTPResponse($body);
 		return $response->addHeader('Content-Type', 'text/plain');

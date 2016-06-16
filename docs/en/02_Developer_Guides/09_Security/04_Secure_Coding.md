@@ -3,65 +3,22 @@
 ## Introduction
 
 This page details notes on how to ensure that we develop secure SilverStripe applications. 
-See our "[Release Process](/misc/release-process#security-releases) on how to report security issues.
+See our "[Release Process](/contributing/release_process#security-releases) on how to report security issues.
 
 ## SQL Injection
 
 The [coding-conventions](/getting_started/coding_conventions) help guard against SQL injection attacks but still require developer
-diligence: ensure that any variable you insert into a filter / sort / join clause is either parameterised, or has been
-escaped.
+diligence: ensure that any variable you insert into a filter / sort / join clause has been escaped.
 
 See [http://shiflett.org/articles/sql-injection](http://shiflett.org/articles/sql-injection).
 
-### Parameterised queries
-
-Parameterised queries, or prepared statements, allow the logic around the query and its structure to be separated from
-the parameters passed in to be executed. Many DB adaptors support these as standard including [PDO](http://php.net/manual/en/pdo.prepare.php),
-[MySQL](http://php.net/manual/en/mysqli.prepare.php), [SQL Server](http://php.net/manual/en/function.sqlsrv-prepare.php),
-[SQLite](http://php.net/manual/en/sqlite3.prepare.php), and [PostgreSQL](http://php.net/manual/en/function.pg-prepare.php).
-
-The use of parameterised queries whenever possible will safeguard your code in most cases, but care
-must still be taken when working with literal values or table/column identifiers that may 
-come from user input.
-
-Example:
-	
-	:::php
-	$records = DB::prepared_query('SELECT * FROM "MyClass" WHERE "ID" = ?', array(3));
-	$records = MyClass::get()->where(array('"ID" = ?' => 3));
-	$records = MyClass::get()->where(array('"ID"' => 3));
-	$records = DataObject::get_by_id('MyClass', 3);
-	$records = DataObject::get_one('MyClass', array('"ID" = ?' => 3));
-	$records = MyClass::get()->byID(3);
-	$records = SQLQuery::create()->addWhere(array('"ID"' => 3))->execute();
-
-Parameterised updates and inserts are also supported, but the syntax is a little different
-
-	:::php
-	SQLInsert::create('"MyClass"')
-		->assign('"Name"', 'Daniel')
-		->addAssignments(array(
-			'"Position"' => 'Accountant',
-			'"Age"' => array(
-				'GREATEST(0,?,?)' => array(24, 28)
-			)
-		))
-		->assignSQL('"Created"', 'NOW()')
-		->execute();
-	DB::prepared_query(
-		'INSERT INTO "MyClass" ("Name", "Position", "Age", "Created") VALUES(?, ?, GREATEST(0,?,?), NOW())'
-		array('Daniel', 'Accountant', 24, 28)
-	);
-
-
 ### Automatic escaping
 
-SilverStripe internally will use parameterised queries in SQL statements wherever possible.
+SilverStripe automatically escapes data in SQL statements wherever possible,
+through database-specific methods (see [api:Database::addslashes()]).
+For [api:MySQLDatabase], this will be [mysql_real_escape_string()](http://de3.php.net/mysql_real_escape_string).
 
-If necessary Silverstripe performs any required escaping through database-specific methods (see `[api:Database->addslashes()]`).
-For `[api:MySQLDatabase]`, this will be `[mysql_real_escape_string()](http://de3.php.net/mysql_real_escape_string)`.
-
-*  Most `[api:DataList]` accessors (see escaping note in method documentation)
+*  Most [api:DataList] accessors (see escaping note in method documentation)
 *  DataObject::get_by_id()
 *  DataObject::update()
 *  DataObject::castedUpdate()
@@ -72,8 +29,7 @@ For `[api:MySQLDatabase]`, this will be `[mysql_real_escape_string()](http://de3
 *  FormField->saveInto()
 *  DBField->saveInto()
 
-Data is not escaped when writing to object-properties, as inserts and updates are normally
-handled via prepared statements.
+Data is escaped when saving back to the database, not when writing to object-properties.
 
 Example:
 	
@@ -82,25 +38,23 @@ Example:
 	$members = Member::get()->filter('Name', $_GET['name']); 
 	// automatically escaped/quoted
 	$members = Member::get()->filter(array('Name' => $_GET['name'])); 
-	// parameterised condition
-	$members = Member::get()->where(array('"Name" = ?' => $_GET['name'])); 
-	// needs to be escaped and quoted manually (note raw2sql called with the $quote parameter set to true)
-	$members = Member::get()->where(sprintf('"Name" = %s', Convert::raw2sql($_GET['name'], true))); 
+	// needs to be escaped/quoted manually
+	$members = Member::get()->where(sprintf('"Name" = \'%s\'', Convert::raw2sql($_GET['name']))); 
 
 <div class="warning" markdown='1'>
-It is NOT good practice to "be sure" and convert the data passed to the functions above manually. This might
+It is NOT good practice to "be sure" and convert the data passed to the functions below manually. This might
 result in *double escaping* and alters the actually saved data (e.g. by adding slashes to your content).
 </div>
 
 ### Manual escaping
 
-As a rule of thumb, whenever you're creating SQL queries (or just chunks of SQL) you should use parameterisation,
-but there may be cases where you need to take care of escaping yourself. See [coding-conventions](/getting_started/coding-conventions)
-and [datamodel](/developer_guides/model) for ways to parameterise, cast, and convert your data.
+As a rule of thumb, whenever you're creating raw queries (or just chunks of SQL), you need to take care of escaping
+yourself. See [coding-conventions](/getting_started/coding_conventions) and [datamodel](/developer_guides/model/data_types_and_casting) for ways to cast and convert
+your data.
 
 *  `SQLQuery`
+*  `DataObject::buildSQL()`
 *  `DB::query()`
-*  `DB::prepared_query()`
 *  `Director::urlParams()`
 *  `Controller->requestParams`, `Controller->urlParams`
 *  `SS_HTTPRequest` data
@@ -110,12 +64,11 @@ Example:
 
 	:::php
 	class MyForm extends Form {
-		public function save($RAW_data, $form) {
-			// Pass true as the second parameter of raw2sql to quote the value safely
-			$SQL_data = Convert::raw2sql($RAW_data, true); // works recursively on an array
-			$objs = Player::get()->where("Name = " . $SQL_data['name']);
-			// ...
-		}
+	  public function save($RAW_data, $form) {
+	    $SQL_data = Convert::raw2sql($RAW_data); // works recursively on an array
+	    $objs = Player::get()->where("Name = '{$SQL_data[name]}'");
+	    // ...
+	  }
 	}
 
 
@@ -126,34 +79,32 @@ Example:
 
 	:::php
 	class MyController extends Controller {
-		private static $allowed_actions = array('myurlaction');
-		public function myurlaction($RAW_urlParams) {
-			// Pass true as the second parameter of raw2sql to quote the value safely
-			$SQL_urlParams = Convert::raw2sql($RAW_urlParams, true); // works recursively on an array
-			$objs = Player::get()->where("Name = " . $SQL_data['OtherID']);
-			// ...
-		}
+	  private static $allowed_actions = array('myurlaction');
+	  public function myurlaction($RAW_urlParams) {
+	    $SQL_urlParams = Convert::raw2sql($RAW_urlParams); // works recursively on an array
+	    $objs = Player::get()->where("Name = '{$SQL_data[OtherID]}'");
+	    // ...
+	  }
 	}
 
 
-As a rule of thumb, you should escape your data **as close to querying as possible**
-(or preferably, use parameterised queries). This means if you've got a chain of functions
-passing data through, escaping should happen at the end of the chain.
+As a rule of thumb, you should escape your data **as close to querying as possible**.
+This means if you've got a chain of functions passing data through, escaping should happen at the end of the chain.
 
 	:::php
 	class MyController extends Controller {
-		/**
-		 * @param array $RAW_data All names in an indexed array (not SQL-safe)
-		 */
-		public function saveAllNames($RAW_data) {
-			// $SQL_data = Convert::raw2sql($RAW_data); // premature escaping
-			foreach($RAW_data as $item) $this->saveName($item);
-		}
-
-		public function saveName($RAW_name) {
-			$SQL_name = Convert::raw2sql($RAW_name, true);
-			DB::query("UPDATE Player SET Name = {$SQL_name}");
-		}
+	  /**
+	   * @param array $RAW_data All names in an indexed array (not SQL-safe)
+	   */
+	  public function saveAllNames($RAW_data) {
+	    // $SQL_data = Convert::raw2sql($RAW_data); // premature escaping
+	    foreach($RAW_data as $item) $this->saveName($item);
+	  }
+	
+	  public function saveName($RAW_name) {
+	    $SQL_name = Convert::raw2sql($RAW_name);
+	    DB::query("UPDATE Player SET Name = '{$SQL_name}'");
+	  }
 	}
 
 This might not be applicable in all cases - especially if you are building an API thats likely to be customized. If
@@ -186,7 +137,7 @@ XSS attack against an admin to perform any administrative action.
 If you can't trust your editors, SilverStripe must be configured to filter the content so that any javascript is
 stripped out
 
-To enable filtering, set the HtmlEditorField::$sanitise_server_side [configuration](/topics/configuration) property to
+To enable filtering, set the HtmlEditorField::$sanitise_server_side [configuration](/developer_guides/configuration/configuration) property to
 true, e.g.
 
 	HtmlEditorField::config()->sanitise_server_side = true
@@ -209,21 +160,21 @@ The `SiteTree.ExtraMeta` property uses this to limit allowed input.
 It is not currently possible to allow editors to provide javascript content and yet still protect other users
 from any malicious code within that javascript.
 
-We recommend configuring [shortcodes](/reference/shortcodes) that can be used by editors in place of using javascript directly.
+We recommend configuring [shortcodes](/developer_guides/extending/shortcodes) that can be used by editors in place of using javascript directly.
 
 ### Escaping model properties
 
-`[api:SSViewer]` (the SilverStripe template engine) automatically takes care of escaping HTML tags from specific
-object-properties by [casting](/topics/datamodel#casting) its string value into a `[api:DBField]` object.
+[api:SSViewer] (the SilverStripe template engine) automatically takes care of escaping HTML tags from specific
+object-properties by [casting](/developer_guides/model/data_types_and_casting) its string value into a [api:DBField] object.
 
 PHP:
 
 	:::php
 	class MyObject extends DataObject {
-		private static $db = array(
-			'MyEscapedValue' => 'Text', // Example value: <b>not bold</b>
-			'MyUnescapedValue' => 'HTMLText' // Example value: <b>bold</b>
-		);
+	  private static $db = array(
+	    'MyEscapedValue' => 'Text', // Example value: <b>not bold</b>
+	    'MyUnescapedValue' => 'HTMLText' // Example value: <b>bold</b>
+	  );
 	}
 
 
@@ -231,8 +182,8 @@ Template:
 
 	:::php
 	<ul>
-		<li>$MyEscapedValue</li> // output: &lt;b&gt;not bold&lt;b&gt;
-		<li>$MyUnescapedValue</li> // output: <b>bold</b>
+	  <li>$MyEscapedValue</li> // output: &lt;b&gt;not bold&lt;b&gt;
+	  <li>$MyUnescapedValue</li> // output: <b>bold</b>
 	</ul>
 
 
@@ -241,18 +192,18 @@ outputting through SSViewer.
 
 ### Overriding default escaping in templates
 
-You can force escaping on a casted value/object by using an [escape type](/topics/datamodel) method in your template, e.g.
+You can force escaping on a casted value/object by using an [escape type](/developer_guides/model/data_types_and_casting) method in your template, e.g.
 "XML" or "ATT". 
 
 Template (see above):
 
 	:::php
 	<ul>
-		// output: <a href="#" title="foo &amp; &#quot;bar&quot;">foo &amp; "bar"</a>
-		<li><a href="#" title="$Title.ATT">$Title</a></li>
-		<li>$MyEscapedValue</li> // output: &lt;b&gt;not bold&lt;b&gt;
-		<li>$MyUnescapedValue</li> // output: <b>bold</b>
-		<li>$MyUnescapedValue.XML</li> // output: &lt;b&gt;bold&lt;b&gt;
+	  // output: <a href="#" title="foo &amp; &#quot;bar&quot;">foo &amp; "bar"</a>
+	  <li><a href="#" title="$Title.ATT">$Title</a></li>
+	  <li>$MyEscapedValue</li> // output: &lt;b&gt;not bold&lt;b&gt;
+	  <li>$MyUnescapedValue</li> // output: <b>bold</b>
+	  <li>$MyUnescapedValue.XML</li> // output: &lt;b&gt;bold&lt;b&gt;
 	</ul>
 
 
@@ -266,7 +217,7 @@ PHP:
 	:::php
 	class MyObject extends DataObject {
 		public $Title = '<b>not bold</b>'; // will be escaped due to Text casting
-		
+	     
 		$casting = array(
 			"Title" => "Text", // forcing a casting
 			'TitleWithHTMLSuffix' => 'HTMLText' // optional, as HTMLText is the default casting
@@ -283,9 +234,9 @@ Template:
 
 	:::php
 	<ul>
-		<li>$Title</li> // output: &lt;b&gt;not bold&lt;b&gt;
-		<li>$Title.RAW</li> // output: <b>not bold</b>
-		<li>$TitleWithHTMLSuffix</li> // output: <b>not bold</b>: <small>(...)</small>
+	  <li>$Title</li> // output: &lt;b&gt;not bold&lt;b&gt;
+	  <li>$Title.RAW</li> // output: <b>not bold</b>
+	  <li>$TitleWithHTMLSuffix</li> // output: <b>not bold</b>: <small>(...)</small>
 	</ul>
 
 
@@ -297,7 +248,7 @@ presentation from business logic.
 When using *customise()* or *renderWith()* calls in your controller, or otherwise forcing a custom context for your
 template, you'll need to take care of casting and escaping yourself in PHP. 
 
-The `[api:Convert]` class has utilities for this, mainly *Convert::raw2xml()* and *Convert::raw2att()* (which is
+The [api:Convert] class has utilities for this, mainly *Convert::raw2xml()* and *Convert::raw2att()* (which is
 also used by *XML* and *ATT* in template code).
 
 PHP:
@@ -323,7 +274,7 @@ Template:
 
 Whenever you insert a variable into an HTML attribute within a template, use $VarName.ATT, no not $VarName.
 
-You can also use the built-in casting in PHP by using the *obj()* wrapper, see [datamodel](/topics/datamodel)  .
+You can also use the built-in casting in PHP by using the *obj()* wrapper, see [datamodel](/developer_guides/model/data_types_and_casting).
 
 ### Escaping URLs
 
@@ -372,14 +323,14 @@ SilverStripe has built-in countermeasures against [CSRF](http://shiflett.org/art
 will automatically contain a `SecurityID` parameter which is generated as a secure hash on the server, connected to the
 currently active session of the user. If this form is submitted without this parameter, or if the parameter doesn't
 match the hash stored in the users session, the request is discarded.
-You can disable this behaviour through `[api:Form->disableSecurityToken()]`.
+You can disable this behaviour through [api:Form::disableSecurityToken()].
 
 It is also recommended to limit form submissions to the intended HTTP verb (mostly `GET` or `POST`)
-through `[api:Form->setStrictFormMethodCheck()]`. 
+through [api:Form::setStrictFormMethodCheck()]. 
 
 Sometimes you need to handle state-changing HTTP submissions which aren't handled through
 SilverStripe's form system. In this case, you can also check the current HTTP request
-for a valid token through `[api:SecurityToken::checkRequest()]`.
+for a valid token through [api:SecurityToken::checkRequest()].
 
 ## Casting user input
 
@@ -398,17 +349,17 @@ Below is an example with different ways you would use this casting technique:
 	:::php
 	public function CaseStudies() {
 	
-		// cast an ID from URL parameters e.g. (mysite.com/home/action/ID)
-		$anotherID = (int)Director::urlParam['ID'];
-
-		// perform a calculation, the prerequisite being $anotherID must be an integer
-		$calc = $anotherID + (5 - 2) / 2;
-
-		// cast the 'category' GET variable as an integer
-		$categoryID = (int)$_GET['category'];
-
-		// perform a byID(), which ensures the ID is an integer before querying
-		return CaseStudy::get()->byID($categoryID);
+	   // cast an ID from URL parameters e.g. (mysite.com/home/action/ID)
+	   $anotherID = (int)Director::urlParam['ID'];
+	
+	   // perform a calculation, the prerequisite being $anotherID must be an integer
+	   $calc = $anotherID + (5 - 2) / 2;
+	
+	   // cast the 'category' GET variable as an integer
+	   $categoryID = (int)$_GET['category'];
+	
+	   // perform a byID(), which ensures the ID is an integer before querying
+	   return CaseStudy::get()->byID($categoryID);
 	}
 
 
@@ -423,7 +374,7 @@ cast types can be found here:
 *  `(object)` - cast to object
 
 Note that there is also a 'SilverStripe' way of casting fields on a class, this is a different type of casting to the
-standard PHP way. See [casting](/topics/datamodel#casting).
+standard PHP way. See [casting](/developer_guides/model/data_types_and_casting).
 
 
 
@@ -439,10 +390,11 @@ disallow certain filetypes.
 Example configuration for Apache2:
 
 	<VirtualHost *:80>
-		<LocationMatch assets/>
-			php_flag engine off
-			Options -ExecCGI -Includes -Indexes
-		</LocationMatch>
+	  ...
+	  <LocationMatch assets/>
+	    php_flag engine off
+	    Options -ExecCGI -Includes -Indexes
+	  </LocationMatch>
 	</VirtualHost>
 
 
@@ -467,37 +419,6 @@ Here's an example for a `.htaccess` file used by the Apache web server:
 		Order allow,deny
 		Allow from all
 	</Files>
-
-
-### User uploaded files
-
-Certain file types are by default excluded from user upload. html, xhtml, htm, and xml files may have embedded,
-or contain links to, external resources or scripts that may hijack browser sessions and impersonate that user.
-Even if the uploader of this content may be a trusted user, there is no safeguard against these users being
-deceived by the content source.
-
-Flash files (swf) are also prone to a variety of security vulnerabilities of their own, and thus by default are
-disabled from file upload. As a standard practice, any users wishing to allow flash upload to their sites should
-take the following precautions:
-
- * Only allow flash uploads from trusted sources, preferably those with available source.
- * Make use of the [AllowScriptAccess](http://helpx.adobe.com/flash/kb/control-access-scripts-host-web.html)
-   parameter to ensure that any embedded Flash file is isolated from its environments scripts. In an ideal
-   situation, all flash content would be served from another domain, and this value is set to "sameDomain". If this
-   is not feasible, this should be set to "never". For trusted flash files you may set this to "sameDomain" without
-   an isolated domain name, but do so at your own risk.
- * Take note of any regional cookie legislation that may affect your users. See
-   [Cookie Law and Flash Cookies](http://eucookiedirective.com/cookie-law-and-flash-cookies/).
-
-See [the Adobe Flash security page](http://www.adobe.com/devnet/flashplayer/security.html) for more information.
-	
-
-ADMIN privileged users may be allowed to override the above upload restrictions if the
-`File.apply_restrictions_to_admin` config is set to false. By default this is true, which enforces these
-restrictions globally.
-
-Additionally, if certain file uploads should be made available to non-privileged users, you can add them to the
-list of allowed extensions by adding these to the `File.allowed_extensions` config.
 
 ## Passwords
 
@@ -543,6 +464,7 @@ controller's `init()` method:
 	class MyController extends Controller {
 		public function init() {
 			parent::init();
+
 			$this->response->addHeader('X-Frame-Options', 'SAMEORIGIN');
 		}
 	}
@@ -580,7 +502,11 @@ server IPs using the SS_TRUSTED_PROXY_IPS define in your _ss_environment.php.
 
 	:::php
 	define('SS_TRUSTED_PROXY_IPS', '127.0.0.1,192.168.0.1');
+	define('SS_TRUSTED_PROXY_HOST_HEADER', 'HTTP_X_FORWARDED_HOST');
+	define('SS_TRUSTED_PROXY_IP_HEADER', 'HTTP_X_FORWARDED_FOR');
+	define('SS_TRUSTED_PROXY_PROTOCOL_HEADER', 'HTTP_X_FORWARDED_PROTOCOL');
 
+At the same time, you'll also need to define which headers you trust from these proxy IPs. Since there are multiple ways through which proxies can pass through HTTP information on the original hostname, IP and protocol, these values need to be adjusted for your specific proxy. The header names match their equivalent `$_SERVER` values.
 
 If there is no proxy server, 'none' can be used to distrust all clients.
 If only trusted servers will make requests then you can use '*' to trust all clients.
@@ -602,7 +528,6 @@ following in your .htaccess to ensure this behaviour is activated.
 In a future release this behaviour will be changed to be on by default, and this environment
 variable will be no longer necessary, thus it will be necessary to always set
 SS_TRUSTED_PROXY_IPS if using a proxy.
-
 
 ##  Related
 

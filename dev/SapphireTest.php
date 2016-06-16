@@ -43,11 +43,7 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 	 */
 	protected $usesDatabase = null;
 
-	/**
-	 * @deprecated since version 4.0
-	 */
 	protected $originalMailer;
-	
 	protected $originalMemberPasswordValidator;
 	protected $originalRequirements;
 	protected $originalIsRunningTest;
@@ -213,11 +209,6 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 		if(Controller::has_curr()) Controller::curr()->setSession(Injector::inst()->create('Session', array()));
 		Security::$database_is_ready = null;
 
-		// Add controller-name auto-routing
-		Config::inst()->update('Director', 'rules', array(
-			'$Controller//$Action/$ID/$OtherID' => '*'
-		));
-		
 		$fixtureFile = static::get_fixture_file();
 
 		$prefix = defined('SS_DATABASE_PREFIX') ? SS_DATABASE_PREFIX : 'ss_';
@@ -225,20 +216,16 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 		// Set up email
 		$this->originalMailer = Email::mailer();
 		$this->mailer = new TestMailer();
-		Injector::inst()->registerService($this->mailer, 'Mailer');
+		Email::set_mailer($this->mailer);
 		Config::inst()->remove('Email', 'send_all_emails_to');
 
 		// Todo: this could be a special test model
 		$this->model = DataModel::inst();
 
 		// Set up fixture
-		if($fixtureFile || $this->usesDatabase || !self::using_temp_db()) {
-			if(substr(DB::get_conn()->getSelectedDatabase(), 0, strlen($prefix) + 5) 
-					!= strtolower(sprintf('%stmpdb', $prefix))) {
-
-				//echo "Re-creating temp database... ";
+		if($fixtureFile || $this->usesDatabase) {
+			if (!self::using_temp_db()) {
 				self::create_temp_db();
-				//echo "done.\n";
 			}
 
 			singleton('DataObject')->flushCache();
@@ -497,7 +484,10 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 		ini_set('memory_limit', ($this->originalMemoryLimit) ? $this->originalMemoryLimit : -1);
 
 		// Restore email configuration
-		$this->originalMailer = null;
+		if($this->originalMailer) {
+			Email::set_mailer($this->originalMailer);
+			$this->originalMailer = null;
+		}
 		$this->mailer = null;
 
 		// Restore password validation
@@ -723,75 +713,8 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 				. var_export($match, true) . ": " . var_export($item, true)
 			);
 		}
-	} 
-
-	/**
-	 * Removes sequences of repeated whitespace characters from SQL queries
-	 * making them suitable for string comparison
-	 * 
-	 * @param string $sql
-	 * @return string The cleaned and normalised SQL string
-	 */
-	protected function normaliseSQL($sql) {
-		return trim(preg_replace('/\s+/m', ' ', $sql));
-	}
-	
-	/**
-	 * Asserts that two SQL queries are equivalent
-	 * 
-	 * @param string $expectedSQL
-	 * @param string $actualSQL
-	 * @param string $message
-	 * @param float $delta
-	 * @param integer $maxDepth
-	 * @param boolean $canonicalize
-	 * @param boolean $ignoreCase
-	 */
-	public function assertSQLEquals($expectedSQL, $actualSQL, $message = '', $delta = 0, $maxDepth = 10,
-		$canonicalize = false, $ignoreCase = false
-	) {
-		// Normalise SQL queries to remove patterns of repeating whitespace
-		$expectedSQL = $this->normaliseSQL($expectedSQL);
-		$actualSQL = $this->normaliseSQL($actualSQL);
-		
-		$this->assertEquals($expectedSQL, $actualSQL, $message, $delta, $maxDepth, $canonicalize, $ignoreCase);
 	}
 
-	/**
-	 * Asserts that a SQL query contains a SQL fragment
-	 *
-	 * @param string $needleSQL
-	 * @param string $haystackSQL
-	 * @param string $message
-	 * @param boolean $ignoreCase
-	 * @param boolean $checkForObjectIdentity
-	 */
-	public function assertSQLContains($needleSQL, $haystackSQL, $message = '', $ignoreCase = false,
-		$checkForObjectIdentity = true
-	) {
-		$needleSQL = $this->normaliseSQL($needleSQL);
-		$haystackSQL = $this->normaliseSQL($haystackSQL);
-
-		$this->assertContains($needleSQL, $haystackSQL, $message, $ignoreCase, $checkForObjectIdentity);
-	}
-
-	/**
-	 * Asserts that a SQL query contains a SQL fragment
-	 *
-	 * @param string $needleSQL
-	 * @param string $haystackSQL
-	 * @param string $message
-	 * @param boolean $ignoreCase
-	 * @param boolean $checkForObjectIdentity
-	 */
-	public function assertSQLNotContains($needleSQL, $haystackSQL, $message = '', $ignoreCase = false,
-		$checkForObjectIdentity = true
-	) {
-		$needleSQL = $this->normaliseSQL($needleSQL);
-		$haystackSQL = $this->normaliseSQL($haystackSQL);
-
-		$this->assertNotContains($needleSQL, $haystackSQL, $message, $ignoreCase, $checkForObjectIdentity);
-	}
 	/**
 	 * Helper function for the DOS matchers
 	 */
@@ -815,18 +738,18 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 	 * Returns true if we are currently using a temporary database
 	 */
 	public static function using_temp_db() {
-		$dbConn = DB::get_conn();
+		$dbConn = DB::getConn();
 		$prefix = defined('SS_DATABASE_PREFIX') ? SS_DATABASE_PREFIX : 'ss_';
-		return $dbConn && (substr($dbConn->getSelectedDatabase(), 0, strlen($prefix) + 5) 
+		return $dbConn && (substr($dbConn->currentDatabase(), 0, strlen($prefix) + 5)
 			== strtolower(sprintf('%stmpdb', $prefix)));
 	}
 
 	public static function kill_temp_db() {
 		// Delete our temporary database
 		if(self::using_temp_db()) {
-			$dbConn = DB::get_conn();
-			$dbName = $dbConn->getSelectedDatabase();
-			if($dbName && DB::get_conn()->databaseExists($dbName)) {
+			$dbConn = DB::getConn();
+			$dbName = $dbConn->currentDatabase();
+			if($dbName && DB::getConn()->databaseExists($dbName)) {
 				// Some DataExtensions keep a static cache of information that needs to
 				// be reset whenever the database is killed
 				foreach(ClassInfo::subclassesFor('DataExtension') as $class) {
@@ -835,7 +758,7 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 				}
 
 				// echo "Deleted temp database " . $dbConn->currentDatabase() . "\n";
-				$dbConn->dropSelectedDatabase();
+				$dbConn->dropDatabase();
 			}
 		}
 	}
@@ -845,7 +768,8 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 	 */
 	public static function empty_temp_db() {
 		if(self::using_temp_db()) {
-			DB::get_conn()->clearAllData();
+			$dbadmin = new DatabaseAdmin();
+			$dbadmin->clearAllData();
 
 			// Some DataExtensions keep a static cache of information that needs to
 			// be reset whenever the database is cleaned out
@@ -865,14 +789,15 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 		global $databaseConfig;
 		$databaseConfig['timezone'] = '+0:00';
 		DB::connect($databaseConfig);
-		$dbConn = DB::get_conn();
+		$dbConn = DB::getConn();
 		$prefix = defined('SS_DATABASE_PREFIX') ? SS_DATABASE_PREFIX : 'ss_';
 		$dbname = strtolower(sprintf('%stmpdb', $prefix)) . rand(1000000,9999999);
 		while(!$dbname || $dbConn->databaseExists($dbname)) {
 			$dbname = strtolower(sprintf('%stmpdb', $prefix)) . rand(1000000,9999999);
 		}
 
-		$dbConn->selectDatabase($dbname, true);
+		$dbConn->selectDatabase($dbname);
+		$dbConn->createDatabase();
 
 		$st = Injector::inst()->create('SapphireTest');
 		$st->resetDBSchema();
@@ -885,9 +810,9 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 
 	public static function delete_all_temp_dbs() {
 		$prefix = defined('SS_DATABASE_PREFIX') ? SS_DATABASE_PREFIX : 'ss_';
-		foreach(DB::get_schema()->databaseList() as $dbName) {
+		foreach(DB::getConn()->allDatabaseNames() as $dbName) {
 			if(preg_match(sprintf('/^%stmpdb[0-9]+$/', $prefix), $dbName)) {
-				DB::get_schema()->dropDatabase($dbName);
+				DB::getConn()->dropDatabaseByName($dbName);
 				if(Director::is_cli()) {
 					echo "Dropped database \"$dbName\"" . PHP_EOL;
 				} else {
@@ -912,26 +837,27 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 			$dataClasses = ClassInfo::subclassesFor('DataObject');
 			array_shift($dataClasses);
 
+			$conn = DB::getConn();
+			$conn->beginSchemaUpdate();
 			DB::quiet();
-			$schema = DB::get_schema();
-			$extraDataObjects = $includeExtraDataObjects ? $this->extraDataObjects : null;
-			$schema->schemaUpdate(function() use($dataClasses, $extraDataObjects){
-				foreach($dataClasses as $dataClass) {
-					// Check if class exists before trying to instantiate - this sidesteps any manifest weirdness
-					if(class_exists($dataClass)) {
-						$SNG = singleton($dataClass);
-						if(!($SNG instanceof TestOnly)) $SNG->requireTable();
-					}
+
+			foreach($dataClasses as $dataClass) {
+				// Check if class exists before trying to instantiate - this sidesteps any manifest weirdness
+				if(class_exists($dataClass)) {
+					$SNG = singleton($dataClass);
+					if(!($SNG instanceof TestOnly)) $SNG->requireTable();
 				}
-				
-				// If we have additional dataobjects which need schema, do so here:
-				if($extraDataObjects) {
-					foreach($extraDataObjects as $dataClass) {
-						$SNG = singleton($dataClass);
-						if(singleton($dataClass) instanceof DataObject) $SNG->requireTable();
-					}
+			}
+
+			// If we have additional dataobjects which need schema, do so here:
+			if($includeExtraDataObjects && $this->extraDataObjects) {
+				foreach($this->extraDataObjects as $dataClass) {
+					$SNG = singleton($dataClass);
+					if(singleton($dataClass) instanceof DataObject) $SNG->requireTable();
 				}
-			});
+			}
+
+			$conn->endSchemaUpdate();
 
 			ClassInfo::reset_db_cache();
 			singleton('DataObject')->flushCache();
@@ -953,9 +879,7 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 			$permission->write();
 			$group->Permissions()->add($permission);
 
-			$member = DataObject::get_one('Member', array(
-				'"Member"."Email"' => "$permCode@example.org"
-			));
+			$member = DataObject::get_one('Member', sprintf('"Email" = \'%s\'', "$permCode@example.org"));
 			if(!$member) $member = Injector::inst()->create('Member');
 
 			$member->FirstName = $permCode;
@@ -975,38 +899,6 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 	 * Cache for logInWithPermission()
 	 */
 	protected $cache_generatedMembers = array();
-
-
-	/**
-	 * Test against a theme.
-	 *
-	 * @param $themeBaseDir string - themes directory
-	 * @param $theme string - theme name
-	 * @param $callback Closure
-	 */
-	protected function useTestTheme($themeBaseDir, $theme, $callback) {
-		Config::nest();
-		global $project;
-
-		$manifest = new SS_TemplateManifest($themeBaseDir, $project, true, true);
-
-		SS_TemplateLoader::instance()->pushManifest($manifest);
-
-		Config::inst()->update('SSViewer', 'theme', $theme);
-
-		$e = null;
-
-		try { $callback(); }
-		catch (Exception $e) { /* NOP for now, just save $e */ }
-
-		// Remove all the test themes we created
-		SS_TemplateLoader::instance()->popManifest();
-		
-		Config::unnest();
-
-		if ($e) throw $e;
-	}
-
 }
 
 
